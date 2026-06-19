@@ -58,10 +58,15 @@ Timeline (UTC):
 
 Prize pool: **TBA**. We're building during registration → ahead of schedule.
 
-**Tracks (S2 differ from S1):** RWA & Business Workflows · **Financial
-Applications: DeFi, Exchanges & Prediction Markets (our primary — "yield tool"
-is a listed example)** · Investment Infrastructure (Funds/DAOs/Governance) ·
-Data/Analytics/Dashboards · Open. See `SUBMISSION.md` for the deliverable map.
+**Tracks (S2 differ from S1):** **Real-World Asset (RWA) & Business Workflows
+(our primary — Canton's flagship use case)** · Financial Applications:
+DeFi/Exchanges/Prediction · Investment Infrastructure (Funds/DAOs/Governance,
+our secondary framing) · Data/Analytics/Dashboards · Open. See `SUBMISSION.md`
+for the deliverable map.
+
+**Positioning (pivoted 2026-06-19):** hero = tokenized-RWA yield (Treasury repo +
+MMF), per Canton's RWA-first roadmap; delta-neutral BTC basis kept as one
+secondary source. Build for the infra Canton is shipping, not only what's live.
 
 ## Open items (pursue via program onboarding / mentors during Delivery)
 

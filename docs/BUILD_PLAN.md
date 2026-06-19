@@ -1,7 +1,13 @@
 # HackCanton MVP — "BasisVault" (tailored build plan)
 
-Tailored from public HackCanton intel (2026-06-19). **Confirm the items in §7
-against your logged-in AppsFactory page** (Season 2 status, deadline, prize pool).
+> **⚠️ Historical (2026-06-19).** This plan captured the BTC delta-neutral framing.
+> The project has since **pivoted to a tokenized-RWA yield vault as the hero**
+> (Treasury repo + MMF), targeting the **RWA & Business Workflows** track, with
+> delta-neutral basis kept as one secondary source. For the current positioning,
+> deliverables, economic flows, and demo script see **`SUBMISSION.md`**; for status
+> see the repo `README.md`. Kept here for the build history.
+
+Tailored from public HackCanton intel (2026-06-19).
 
 ## 0. The hackathon (HackCanton, by AppsFactory + Canton Foundation + Noders)
 - **Tracks:** DeFi · RWA · DAO & Governance · AI.

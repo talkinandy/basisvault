@@ -1,120 +1,149 @@
 # BasisVault
 
-**A privacy-preserving, auditable delta-neutral yield vault on the [Canton Network](https://canton.network).**
+**A privacy-preserving, auditable tokenized-RWA yield vault on the [Canton Network](https://canton.network).**
 
-BasisVault captures funding/basis **carry** — short [PerpSwap](https://docs.canton.network) +
-long [Helvet Swap](https://docs.canton.network)/spot on the same underlying (CBTC), so price nets
-to ≈ 0 and the funding level is collected — and shows institutions a yield they can **audit**,
-while keeping positions **counterparty-private** via Canton's need-to-know disclosure.
+BasisVault gives institutions **on-chain yield they can audit** — and keep
+confidential. It allocates vault capital across Canton's tokenized real-world-asset
+yield sources — **tokenized-Treasury repo carry** and **money-market-fund base
+yield** (with tokenized credit as a stretch) — via a rules-based, regime-aware
+allocator, and marks every position to an **oracle rate** so the yield is real, not
+projected. A delta-neutral **basis** strategy (short perp + long spot) is included
+as one secondary source. Canton's **need-to-know disclosure** does the rest: the
+auditor sees the whole book, each investor sees only their own holding, and
+counterparties see nothing.
 
-Built for **HackCanton League — Season 2** (hosted by NODERS). Track: **Financial
-Applications: DeFi, Exchanges & Prediction Markets**. **Submission deadline:
-2026-07-25 23:59 UTC** · Grand Final 2026-08-05. See [`docs/SUBMISSION.md`](docs/SUBMISSION.md)
-for the track-requirement map, economic flows, GTM, and demo script.
+Built for **HackCanton League — Season 2** (hosted by NODERS). Track: **Real-World
+Asset (RWA) & Business Workflows**. **Submission deadline: 2026-07-25 23:59 UTC** ·
+Grand Final 2026-08-05. See [`docs/SUBMISSION.md`](docs/SUBMISSION.md) for the
+track-requirement map, economic flows, GTM, and demo script.
 
 ---
 
-## Why it fits the winning pattern
+## Why it fits Canton (and the winning pattern)
+
+Canton's flagship use case is **institutional, regulated, tokenized RWA** —
+Treasuries, repo, MMFs, credit. "Auditable, privacy-preserving yield on tokenized
+Treasuries you can show your auditor and hide from counterparties" is exactly the
+institutional-first, privacy-first axis that won Season 1 (Confimarket).
 
 | Judges care about | BasisVault shows |
 |---|---|
-| **Institutional-grade** | Daml roles — Investor / Manager / Operator(custodian) / Auditor — authorization-first |
-| **Privacy-first** (the Season-1 / Confimarket axis) | per-party need-to-know disclosure: auditor sees all, investor sees only their own, outsider sees **nothing** |
-| **Oracles** (Chainlink Labs judge) | oracle-anchored marks for NAV + funding/basis input |
-| **Security** (Quantstamp judge) | deterministic Daml, explicit guards, no phantom yield |
-| **Real volume** (network reward pool) | every rebalance trades on PerpSwap/Helvet — measurable on-chain volume |
+| **RWA / institutional** | tokenized-Treasury repo + MMF yield as the hero; fund roles enforced by Daml |
+| **Privacy-first** (the S1 axis) | per-party need-to-know: auditor sees all, holder sees own, outsider sees nothing |
+| **Oracles** (Chainlink judge) | every allocation marked to an oracle `RateFeed`; basis source marked to price |
+| **Security / honesty** (Quantstamp) | deterministic Daml, explicit guards, **realized yield only — no phantom NAV** |
+| **Real volume** (network reward pool) | allocations + rebalances are on-chain activity; live counter on the dashboard |
 
-## Roles & privacy (the judging wedge)
+## The RWA workflow (what the track asks for)
 
-| Party | Sees | Authorizes |
+The RWA track wants one end-to-end workflow — *create → update status → fulfill →
+audit/report* — with roles. BasisVault's allocation lifecycle **is** that workflow:
+
+| Step | On-chain (Daml) | Role |
 |---|---|---|
-| **operator** (custodian) | everything it signs | mint/burn shares, approve rebalances |
-| **manager** (off-chain strategy engine) | vault state | *proposes* rebalances (cannot mint) |
-| **auditor** (regulator / fund auditor) | **everything** | nothing |
-| **investor** | **only their own** holding | deposit / request redeem |
-| **counterparty / outsider** | **nothing** | — |
+| **create** | `Vault_ProposeAllocation` → `AllocationProposal_Approve` (at the oracle rate feed) | manager proposes, operator approves |
+| **update status** | `Vault_AccrueAllocation` — marks *realized* yield to NAV (repeatable) | operator |
+| **fulfill** | `Vault_CloseAllocation` — capital returns to idle NAV | operator |
+| **audit/report** | auditor observes vault + every allocation + accrued yield throughout | auditor |
 
-`Test.VaultTest:testPrivacy` proves the outsider sees zero contracts — Canton's need-to-know
-disclosure in action.
+## Roles & privacy (the wedge)
+
+| Party | Role | Sees | Authorizes |
+|---|---|---|---|
+| **operator** | custodian / issuer | everything it signs | approve allocations, accrue, close, mint/burn |
+| **manager** | off-chain allocator | vault state | *proposes* allocations (cannot mint) |
+| **auditor** | regulator / observer | **everything** | nothing |
+| **investor** | holder | **only their own** holding + NAV + headline yield | deposit / request redeem |
+| **outsider** | — | **nothing** | — |
+
+`Test.VaultTest:testPrivacy` proves the outsider sees zero contracts; `testAllocation`
+proves the investor cannot see the strategy book — Canton need-to-know in action.
 
 ---
 
-## Status
+## Proof: honest backtest on real rates
 
-**Day-1 + Day-2 on-chain core — compiles + tests GREEN on Daml SDK 3.4.11 (Daml 3.x).**
+The allocator replayed over **3 years of real SOFR (repo) + 3-month T-bill (MMF)**
+data — a transparent public proxy for Canton's tokenized-RWA yields:
+
+| Strategy | APY | Max drawdown | Deployed | Notes |
+|---|---|---|---|---|
+| **RWA repo + MMF (hero)** | **4.45%** | **0.00%** | 94% | capital-preserving institutional yield |
+| Basis / delta-neutral (secondary) | 3.95% | 0.07% | 63% | BTC funding proxy; vs naive 4.84% @ 0.38% |
+
+Non-lookahead, real turnover costs, idle cash earns 0, **realized yield only**.
+Reproduce: `python -m basisvault_engine.backtest`.
+
+## Status — all green
 
 ```
-daml build → basisvault-0.1.0.dar
-daml test  → testDepositRedeem ✓  testPrivacy ✓  testRebalance ✓
+daml test     -> setupParties · testDepositRedeem · testPrivacy · testRebalance · testAllocation   (5 ✓)
+pytest        -> 28 passed  (strategy · allocator · backtest · ledger · dashboard)
 ```
 
-Day-2 wires the carry on-chain against a **mock venue adapter** (`BasisVault.Venue`):
-approving a rebalance opens a short + long leg at the **oracle mark**, guards
-**net delta ≈ 0**, records a `DeltaNeutralPosition`, and `Unwind` closes both legs —
-all under need-to-know privacy. The real PerpSwap/Helvet adapters drop into the
-leg-execution seam with no change to the vault choreography.
-
-Canton Network is Daml 3.x (mainnet on Canton 3.5.x / Splice 0.6.x). 3.4.11 is the latest
-stable open-source SDK; per the Canton docs its `.dar`s are compatible with the current
-Splice/Canton release. See [`docs/DEV_NOTES.md`](docs/DEV_NOTES.md) for version pinning and
-open blockers.
+Canton is Daml 3.x (mainnet Canton 3.5.x / Splice 0.6.x); pinned to SDK **3.4.11**
+(latest stable open-source; `.dar`s compatible per the Canton docs). RWA assets and
+venue legs that aren't live on Canton yet sit behind **mock seams** — real
+tokenized-RWA tokens, venue adapters, and the live JSON-Ledger-API client drop in
+unchanged as the infrastructure ships / onboarding lands. See
+[`docs/DEV_NOTES.md`](docs/DEV_NOTES.md).
 
 ## Layout
 
 ```
-daml.yaml                       Daml package config (sdk-version 3.4.11)
-daml/BasisVault/Types.daml      Underlying / Venue / Side / RebalancePlan (no templates)
-daml/BasisVault/Vault.daml      Vault, ShareHolding, Deposit/Redeem requests, RebalanceProposal
-daml/BasisVault/Venue.daml      PriceFeed (oracle mark) + VenueLeg (mock PerpSwap/Helvet adapter seam)
-daml/BasisVault/Position.daml   DeltaNeutralPosition — opened on approval, net-delta-≈0 guard, Unwind
-daml/Test/VaultTest.daml        deposit/redeem + privacy guarantee + delta-neutral rebalance/unwind
-docs/BUILD_PLAN.md              tailored MVP, 4-day plan, demo script, judging map
-docs/SCOPING.md                 feasibility + concept rationale
-docs/DEV_NOTES.md               SDK/version facts, Canton docs links, open blockers
-engine/                         off-chain strategy engine (carry logic + JSON Ledger API client)
-web/                            privacy-aware auditable-yield dashboard (FastAPI)
+daml/BasisVault/Types.daml        Underlying/Venue/Side + YieldSourceKind + Allocation/RebalancePlan
+daml/BasisVault/YieldSource.daml  RateFeed (oracle yield) + Allocation (RWA source) — the hero
+daml/BasisVault/Vault.daml        Vault + roles; allocation workflow + deposit/redeem + basis rebalance
+daml/BasisVault/Venue.daml        PriceFeed + VenueLeg (mock perp/spot adapter seam — basis source)
+daml/BasisVault/Position.daml     DeltaNeutralPosition (basis source), net-delta-≈0 guard, Unwind
+daml/Test/VaultTest.daml          deposit/redeem · privacy · rebalance · RWA allocation lifecycle
+engine/basisvault_engine/
+  allocator.py                    rules-based RWA allocation (the hero strategy)
+  strategy.py                     delta-neutral carry logic (secondary basis source)
+  backtest.py                     RWA + basis backtests (real rate/funding data)
+  ledger.py                       LedgerClient: Mock (zero creds) + JSON Ledger API
+  models.py · engine.py · config.py
+engine/scripts/                   fetch_rates.py (FRED SOFR/T-bill), fetch_funding.py (Binance)
+engine/data/                      committed real rate/funding data + backtest results
+web/app.py                        dashboard: RWA portfolio + backtest band + role views
+docs/                             SUBMISSION.md (submission pack) · SCOPING · BUILD_PLAN · DEV_NOTES
 ```
 
 ## Build & test
 
-Needs a JDK (17 used here) + the Daml SDK 3.4.11 (Daml 3.x):
-
 ```bash
-# install the SDK (public open-source tarball)
+# Daml (needs JDK 17)
 curl -sSL -o daml-sdk-3.4.11.tar.gz \
   https://github.com/digital-asset/daml/releases/download/v3.4.11/daml-sdk-3.4.11-linux-x86_64.tar.gz
 tar xzf daml-sdk-3.4.11.tar.gz && (cd sdk-3.4.11 && ./install.sh)
 export PATH="$HOME/.daml/bin:$PATH"
+daml build && daml test
 
-# from the repo root
-daml build          # -> .daml/dist/basisvault-0.1.0.dar
-daml test           # setupParties, testDepositRedeem, testPrivacy — all ok
-daml start          # sandbox + Navigator to click through deposit/privacy
+# Engine + dashboard
+cd engine && python -m venv .venv && . .venv/bin/activate
+pip install -e '.[dev,ledger,dashboard]'
+pytest -q
+python scripts/fetch_rates.py 3 && python -m basisvault_engine.backtest   # real-data backtest
+uvicorn web.app:app --reload   # dashboard at localhost:8000 (run from repo root)
 ```
 
 > Before deploying: move `daml/Test/` into its own package so the production `.dar`
-> doesn't ship `daml-script` (the build emits a warning about this).
+> doesn't ship `daml-script`.
 
-## Roadmap (per `docs/BUILD_PLAN.md`)
+## Roadmap
 
-- **Day 1 ✅** — Daml vault + roles + deposit/redeem + privacy demo (green).
-- **Day 2 ✅** — `RebalanceProposal_Approve` → short + long legs (mock adapters) →
-  `DeltaNeutralPosition`, net-delta-≈0 guard, oracle-anchored mark, unwind (green).
-  *Pending real PerpSwap/Helvet interfaces to replace the mock leg execution.*
-- **Day 3 ✅** — off-chain strategy engine (`engine/`: carry logic, sign-guard unwind,
-  stale/kill-switch guards, mock + JSON-Ledger-API clients, 12 tests green) + a
-  privacy-aware dashboard (`web/`: auditor/investor/outsider role views). Runs end-to-end
-  with zero creds via the mock ledger; `JsonLedgerClient` drops in once testnet access lands.
-- **Day 4 (in progress)** — network-activity/volume counter on the dashboard; honest
-  backtest on historical CBTC funding/basis; demo script (drafted in `docs/SUBMISSION.md`).
-- **Submission packaging** — `docs/SUBMISSION.md`: track-requirement map, economic flows
-  & incentives, GTM + ICP, demo script, deliverable checklist.
-- **Stretch** — tokenized-RWA collateral leg → crosses into the RWA track.
+- **On-chain ✅** — vault + roles + privacy; RWA allocation workflow (create/accrue/close);
+  basis source (delta-neutral rebalance/unwind). 5 Daml scripts green.
+- **Off-chain ✅** — RWA allocator + delta-neutral strategy + real-data backtests + mock/JSON
+  ledger clients; 28 tests green.
+- **Dashboard ✅** — RWA portfolio + auditable backtest band + network-activity, role-filtered.
+- **Submission packaging** — `docs/SUBMISSION.md`: track map, economic flows, GTM/ICP, demo script.
+- **Pending onboarding (Delivery phase, Jul 4+)** — real tokenized-RWA assets + rate feeds, testnet
+  + JSON Ledger API creds, deploy; swap mock seams for live.
 
-> **Venue reality (researched 2026-06-19):** the real, publicly-attested Canton
-> trading venues are **Canborsa** (perps), **Helvet Swap** (CBTC/CC AMM, early
-> access), **Cantex** (spot DEX), **Temple Lightspeed** (institutional CLOB), with
-> **Chainlink** oracles live. None publish open Daml interfaces or testnet creds
-> yet (pursue via the Delivery-phase onboarding/mentors) — both the on-chain venue
-> legs and the engine's live ledger client are built behind mock seams so the real
-> adapters drop in unchanged.
+> **Canton RWA / venue reality (researched 2026-06-19):** Canton's tokenized-RWA
+> rails are still rolling out; live trading venues include **Canborsa** (perps),
+> **Helvet Swap** (CBTC/CC AMM), **Cantex** (spot DEX), **Temple Lightspeed** (CLOB),
+> with **Chainlink** oracles live. None publish open Daml interfaces or testnet creds
+> yet — hence the mock seams. Building for the infrastructure Canton is shipping, not
+> only what exists today.

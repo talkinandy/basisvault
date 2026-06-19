@@ -1,6 +1,12 @@
 # Canton Network Hackathon — Feasibility & MVP Scope
 
-Branch: `canton-hackathon` (worktree off `fundingcarry`). Status: scoping draft, 2026-06-19.
+> **Note (2026-06-19):** the project's current hero is the **tokenized-RWA yield
+> vault** described in §3–4 below (repo/MMF carry) — this scoping doc's original
+> instinct, which we returned to after a BTC delta-neutral detour. Current
+> positioning + deliverables live in **`SUBMISSION.md`**; this doc is kept for
+> rationale/history.
+
+Status: scoping draft, 2026-06-19.
 
 > "Canon Network" = **Canton Network**. The hackathon host **AppsFactory**
 > (`appsfactory.cc`, OG tag: *"A One-Stop Canton Ecosystem Portal"*) is built by
