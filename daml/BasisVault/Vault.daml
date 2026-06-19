@@ -13,6 +13,8 @@
 module BasisVault.Vault where
 
 import BasisVault.Types
+import BasisVault.Venue
+import BasisVault.Position
 
 -- Price per share; bootstraps to 1.0 when the vault is empty. Top-level so it
 -- is callable from any choice (a template-body `let` can't carry an inline type
@@ -142,10 +144,40 @@ template RebalanceProposal
     signatory manager
     observer operator, auditor
 
-    -- Day-2: approval executes short PerpSwap + long Helvet legs via adapters.
-    choice RebalanceProposal_Approve : ()
+    -- Operator approves: open the short PerpSwap + long Helvet legs at the
+    -- oracle mark, guard net delta ≈ 0, and record the live position. Consuming,
+    -- so a proposal is acted on once. MOCK venue fills (see BasisVault.Venue) —
+    -- the real PerpSwap/Helvet adapters drop into the leg creation below.
+    choice RebalanceProposal_Approve : ContractId DeltaNeutralPosition
+      with
+        priceFeedCid : ContractId PriceFeed   -- oracle-anchored mark
       controller operator
-      do pure ()  -- TODO Day-2: call venue adapters, assert net delta ≈ 0
+      do
+        feed <- fetch priceFeedCid
+        assertMsg "price feed underlying must match the plan"
+          (feed.underlying == plan.underlying)
+
+        -- equal-notional both legs ⇒ price exposure cancels; we collect funding.
+        let shortNotional = plan.notional
+        let longNotional = plan.notional
+        assertMsg "net delta must be ~0 (equal-notional hedge)"
+          (abs (netDelta longNotional shortNotional) <= 0.000001)
+
+        shortLeg <- create VenueLeg with
+          operator; manager; auditor
+          venue = plan.shortVenue; underlying = plan.underlying
+          side = Short; notional = shortNotional; entryPrice = feed.price
+        longLeg <- create VenueLeg with
+          operator; manager; auditor
+          venue = plan.longVenue; underlying = plan.underlying
+          side = Long; notional = longNotional; entryPrice = feed.price
+
+        create DeltaNeutralPosition with
+          operator; manager; auditor
+          underlying = plan.underlying
+          shortLeg; longLeg
+          shortNotional; longNotional
+          markPrice = feed.price
 
     choice RebalanceProposal_Reject : ()
       controller operator

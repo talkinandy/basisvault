@@ -38,12 +38,18 @@ disclosure in action.
 
 ## Status
 
-**Day-1 on-chain core — compiles + tests GREEN on Daml SDK 3.4.11 (Daml 3.x).**
+**Day-1 + Day-2 on-chain core — compiles + tests GREEN on Daml SDK 3.4.11 (Daml 3.x).**
 
 ```
 daml build → basisvault-0.1.0.dar
-daml test  → setupParties ✓  testDepositRedeem ✓  testPrivacy ✓
+daml test  → testDepositRedeem ✓  testPrivacy ✓  testRebalance ✓
 ```
+
+Day-2 wires the carry on-chain against a **mock venue adapter** (`BasisVault.Venue`):
+approving a rebalance opens a short + long leg at the **oracle mark**, guards
+**net delta ≈ 0**, records a `DeltaNeutralPosition`, and `Unwind` closes both legs —
+all under need-to-know privacy. The real PerpSwap/Helvet adapters drop into the
+leg-execution seam with no change to the vault choreography.
 
 Canton Network is Daml 3.x (mainnet on Canton 3.5.x / Splice 0.6.x). 3.4.11 is the latest
 stable open-source SDK; per the Canton docs its `.dar`s are compatible with the current
@@ -56,8 +62,9 @@ open blockers.
 daml.yaml                       Daml package config (sdk-version 3.4.11)
 daml/BasisVault/Types.daml      Underlying / Venue / Side / RebalancePlan (no templates)
 daml/BasisVault/Vault.daml      Vault, ShareHolding, Deposit/Redeem requests, RebalanceProposal
-daml/BasisVault/Position.daml   DeltaNeutralPosition (Day-2: wired on rebalance approval)
-daml/Test/VaultTest.daml        deposit/redeem accounting + the privacy guarantee
+daml/BasisVault/Venue.daml      PriceFeed (oracle mark) + VenueLeg (mock PerpSwap/Helvet adapter seam)
+daml/BasisVault/Position.daml   DeltaNeutralPosition — opened on approval, net-delta-≈0 guard, Unwind
+daml/Test/VaultTest.daml        deposit/redeem + privacy guarantee + delta-neutral rebalance/unwind
 docs/BUILD_PLAN.md              tailored MVP, 4-day plan, demo script, judging map
 docs/SCOPING.md                 feasibility + concept rationale
 docs/DEV_NOTES.md               SDK/version facts, Canton docs links, open blockers
@@ -88,8 +95,9 @@ daml start          # sandbox + Navigator to click through deposit/privacy
 ## Roadmap (per `docs/BUILD_PLAN.md`)
 
 - **Day 1 ✅** — Daml vault + roles + deposit/redeem + privacy demo (green).
-- **Day 2** — wire `RebalanceProposal_Approve` → short PerpSwap + long Helvet legs →
-  create `DeltaNeutralPosition`, assert net delta ≈ 0; add oracle mark.
+- **Day 2 ✅** — `RebalanceProposal_Approve` → short + long legs (mock adapters) →
+  `DeltaNeutralPosition`, net-delta-≈0 guard, oracle-anchored mark, unwind (green).
+  *Pending real PerpSwap/Helvet interfaces to replace the mock leg execution.*
 - **Day 3** — off-chain strategy engine (reuse BasisYield analytics/allocation) via the
   JSON Ledger API; repoint the dashboard at live vault state.
 - **Day 4** — backtest on historical CBTC funding/basis; demo script; volume counter for

@@ -1,0 +1,48 @@
+-- Venue adapters + oracle mark (Day-2).
+--
+-- MOCK for the hackathon: a leg is "executed" by creating a `VenueLeg` contract
+-- and closed by archiving it. This is the seam where the REAL adapters drop in —
+-- swap the `create VenueLeg` / `VenueLeg_Close` bodies for calls into the
+-- PerpSwap (short) and Helvet Swap (long) Daml packages once their interfaces
+-- are available. The vault choreography in Vault.daml does not change.
+module BasisVault.Venue where
+
+import BasisVault.Types
+
+-- An oracle-anchored mark (Chainlink / RedStone in production). We mark legs
+-- against THIS, not last-trade — the discipline Quantstamp/Chainlink judges look
+-- for. The oracle signs; the operator observes so it can fetch the mark when it
+-- approves a rebalance.
+template PriceFeed
+  with
+    oracle : Party
+    operator : Party
+    underlying : Underlying
+    price : Decimal
+  where
+    signatory oracle
+    observer operator
+    ensure price > 0.0
+
+-- One executed leg of the delta-neutral pair. signatory operator (the custodian
+-- holds the position); manager + auditor observe (need-to-know: outsiders see
+-- nothing). Closing archives it (mock fill close).
+template VenueLeg
+  with
+    operator : Party
+    manager : Party
+    auditor : Party
+    venue : Venue
+    underlying : Underlying
+    side : Side
+    notional : Decimal
+    entryPrice : Decimal
+  where
+    signatory operator
+    observer manager, auditor
+    ensure notional >= 0.0 && entryPrice > 0.0
+
+    -- Close the leg. MOCK: archive. REAL adapter: close on PerpSwap / Helvet.
+    choice VenueLeg_Close : ()
+      controller operator
+      do pure ()

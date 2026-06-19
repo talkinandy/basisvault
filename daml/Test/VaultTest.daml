@@ -5,6 +5,8 @@ module Test.VaultTest where
 import Daml.Script
 import DA.Assert ((===))
 import BasisVault.Vault
+import BasisVault.Venue
+import BasisVault.Position
 import BasisVault.Types
 
 data Parties = Parties
@@ -12,6 +14,7 @@ data Parties = Parties
     operator : Party
     manager : Party
     auditor : Party
+    oracle : Party
     alice : Party
     mallory : Party
 
@@ -20,6 +23,7 @@ setupParties = do
   operator <- allocateParty "Operator"
   manager  <- allocateParty "Manager"
   auditor  <- allocateParty "Auditor"
+  oracle   <- allocateParty "Oracle"
   alice    <- allocateParty "AliceInvestor"
   mallory  <- allocateParty "MalloryOutsider"
   pure Parties with ..
@@ -88,3 +92,56 @@ testPrivacy = do
   assertMsg "outsider must NOT see the vault" (null mVaults)
   mHoldings <- query @ShareHolding p.mallory
   assertMsg "outsider must NOT see any holding" (null mHoldings)
+
+-- Day-2: the carry, on-chain. Manager proposes a delta-neutral pair; operator
+-- approves at the oracle mark; both legs open equal-notional (net delta ≈ 0); a
+-- DeltaNeutralPosition records it; unwind closes both legs. Privacy holds
+-- throughout (auditor sees the book, outsider sees nothing).
+testRebalance : Script ()
+testRebalance = do
+  p <- setupParties
+  vault <- submit p.operator do
+    createCmd Vault with
+      operator = p.operator; manager = p.manager; auditor = p.auditor
+      underlying = CBTC; totalAssets = 0.0; totalShares = 0.0
+
+  -- oracle publishes a CBTC mark; operator can see it (observer).
+  feed <- submit p.oracle do
+    createCmd PriceFeed with
+      oracle = p.oracle; operator = p.operator; underlying = CBTC; price = 65000.0
+
+  -- manager proposes a delta-neutral pair: short PerpSwap + long Helvet, equal notional.
+  let plan = RebalancePlan with
+        underlying = CBTC; shortVenue = PerpSwap; longVenue = HelvetSwap
+        notional = 1000.0
+  proposal <- submit p.manager do
+    exerciseCmd vault Vault_ProposeRebalance with plan
+
+  -- operator approves at the oracle mark.
+  posCid <- submit p.operator do
+    exerciseCmd proposal RebalanceProposal_Approve with priceFeedCid = feed
+
+  -- the position is equal-notional (net delta ≈ 0) and marked at the oracle price.
+  optPos <- queryContractId p.operator posCid
+  case optPos of
+    Some pos -> do
+      netDelta pos.longNotional pos.shortNotional === 0.0
+      pos.markPrice === 65000.0
+    None -> abort "delta-neutral position not found after approval"
+
+  -- both legs opened, visible to the auditor; outsider sees nothing.
+  auditorLegs <- query @VenueLeg p.auditor
+  assertMsg "auditor sees both legs" (length auditorLegs == 2)
+  auditorPos <- query @DeltaNeutralPosition p.auditor
+  assertMsg "auditor sees the position" (length auditorPos == 1)
+  mLegs <- query @VenueLeg p.mallory
+  assertMsg "outsider must NOT see any leg" (null mLegs)
+  mPos <- query @DeltaNeutralPosition p.mallory
+  assertMsg "outsider must NOT see the position" (null mPos)
+
+  -- unwind: operator closes both legs and the position.
+  submit p.operator do exerciseCmd posCid DeltaNeutralPosition_Unwind
+  legsAfter <- query @VenueLeg p.operator
+  assertMsg "legs closed after unwind" (null legsAfter)
+  posAfter <- query @DeltaNeutralPosition p.operator
+  assertMsg "position closed after unwind" (null posAfter)

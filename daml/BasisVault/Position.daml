@@ -1,9 +1,15 @@
--- Day-2 stub: a live delta-neutral position, created when the operator approves
--- a RebalanceProposal and the venue adapters (PerpSwap short + Helvet long) fill.
--- Kept here so the structure is visible; not yet wired into Vault.
+-- A live delta-neutral position, created when the operator approves a
+-- RebalanceProposal and the venue adapters (PerpSwap short + Helvet long) fill.
+-- Wired into Vault.RebalanceProposal_Approve (Day-2).
 module BasisVault.Position where
 
 import BasisVault.Types
+import BasisVault.Venue
+
+-- net delta of an equal-notional hedge: long notional minus short notional.
+-- ≈ 0 by construction; the approve choice guards on this.
+netDelta : Decimal -> Decimal -> Decimal
+netDelta longNotional shortNotional = longNotional - shortNotional
 
 template DeltaNeutralPosition
   with
@@ -11,16 +17,23 @@ template DeltaNeutralPosition
     manager : Party
     auditor : Party
     underlying : Underlying
-    shortNotional : Decimal   -- PerpSwap leg (receives funding)
-    longNotional : Decimal    -- Helvet/spot leg (cancels price)
+    shortLeg : ContractId VenueLeg   -- PerpSwap leg (receives funding)
+    longLeg : ContractId VenueLeg    -- Helvet/spot leg (cancels price)
+    shortNotional : Decimal
+    longNotional : Decimal
+    markPrice : Decimal              -- oracle mark at open (not last-trade)
   where
     signatory operator
     observer manager, auditor
     -- equal-notional hedge ⇒ net delta ≈ 0
     ensure shortNotional >= 0.0 && longNotional >= 0.0
 
-    -- Day-2: unwind both legs when trailing funding turns negative (sign guard),
-    -- mirroring the BasisYield cash-carry auto-unwind.
+    -- Unwind both legs (e.g. when trailing funding turns negative — the sign
+    -- guard, mirroring the BasisYield cash-carry auto-unwind). Consuming, so the
+    -- position is closed once.
     choice DeltaNeutralPosition_Unwind : ()
       controller operator
-      do pure ()  -- TODO Day-2: close legs via venue adapters
+      do
+        exercise shortLeg VenueLeg_Close
+        exercise longLeg VenueLeg_Close
+        pure ()
