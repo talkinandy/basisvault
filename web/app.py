@@ -21,17 +21,34 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "engine"))
 from fastapi import FastAPI  # noqa: E402
 from fastapi.responses import HTMLResponse, JSONResponse  # noqa: E402
 
+from basisvault_engine.engine import tick  # noqa: E402
 from basisvault_engine.ledger import MockLedgerClient  # noqa: E402
-from basisvault_engine.models import MarketSnapshot, PositionState, Underlying  # noqa: E402
+from basisvault_engine.models import MarketSnapshot, Underlying  # noqa: E402
 from basisvault_engine.strategy import expected_carry  # noqa: E402
 
 app = FastAPI(title="BasisVault")
 
-# Demo state: a funded vault with a live, delta-neutral position.
-_client = MockLedgerClient(
-    position=PositionState("pos-1", Underlying.CBTC, 900_000.0, 900_000.0, 65_000.0)
-)
 _market = MarketSnapshot(Underlying.CBTC, 65_000.0, funding_rate=0.12, basis=0.01, age_seconds=5.0)
+
+
+def _seed_demo_client() -> MockLedgerClient:
+    """A funded vault driven through a few real engine ticks so the live position
+    and the network-activity counter reflect actual routed volume, not a constant.
+    """
+    client = MockLedgerClient()
+    # open, hold (within band), then a resize after a deposit grows NAV
+    tick(client, _market, dry_run=False)                      # open ~900k/leg
+    tick(client, _market, dry_run=False)                      # hold (no churn)
+    client._vault = client.get_vault().__class__(             # NAV grows -> resize
+        contract_id=client.get_vault().contract_id,
+        underlying=Underlying.CBTC,
+        total_assets=1_500_000.0, total_shares=1_000_000.0,
+    )
+    tick(client, _market, dry_run=False)                      # resize ~1.35M/leg
+    return client
+
+
+_client = _seed_demo_client()
 
 ROLES = ("auditor", "investor", "outsider")
 
@@ -67,6 +84,7 @@ def state_for(role: str) -> dict:
         "markPrice": pos.mark_price,
     }
     base["carryAnnualizedPct"] = round(expected_carry(_market) * 100, 2)
+    base["networkActivity"] = _client.metrics()  # reward-pool story
     base["note"] = "Auditor sees the full book (vault + position + carry)."
     return base
 

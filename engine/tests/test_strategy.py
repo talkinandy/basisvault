@@ -106,3 +106,24 @@ def test_dry_run_does_not_mutate_ledger():
     client = MockLedgerClient(vault=VAULT)
     tick(client, mkt(funding=0.12), dry_run=True)
     assert client.get_position() is None  # dry-run never acted
+
+
+def test_network_activity_volume_accrues():
+    client = MockLedgerClient(vault=VAULT)
+    m = client.metrics()
+    assert m["routedNotional"] == 0.0 and m["rebalanceCount"] == 0.0
+
+    # open: routes both legs (2 x per-leg notional)
+    tick(client, mkt(funding=0.12), dry_run=False)
+    leg = VAULT.total_assets * PARAMS.target_deploy_fraction
+    after_open = client.metrics()
+    assert after_open["routedNotional"] == 2.0 * leg
+    assert after_open["rebalanceCount"] == 1.0
+    assert after_open["openGrossNotional"] == 2.0 * leg
+
+    # unwind: routes the closed gross + counts as activity
+    tick(client, mkt(funding=-0.02), dry_run=False)
+    after_unwind = client.metrics()
+    assert after_unwind["routedNotional"] == 2.0 * leg + 2.0 * leg
+    assert after_unwind["rebalanceCount"] == 2.0
+    assert after_unwind["openGrossNotional"] == 0.0

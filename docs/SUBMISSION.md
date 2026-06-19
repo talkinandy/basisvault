@@ -20,7 +20,7 @@ The DeFi track asks for four things. Map:
 |---|---|---|
 | **MVP financial product** (DEX module / lending / prediction / **yield tool**) | Daml vault + roles + delta-neutral rebalance + oracle mark; off-chain carry engine; privacy dashboard | ✅ built, green |
 | **Clear explanation of economic flows & user incentives** | §1 below | ✅ |
-| **Demonstration of meaningful network activity** | §2 below (every rebalance trades on-chain → reward-pool eligible) | ◻ wire volume counter (Day-4) |
+| **Demonstration of meaningful network activity** | §2 below (every rebalance trades on-chain → reward-pool eligible) | ✅ live volume counter on dashboard |
 | **GTM outline + target user profile** | §3 below | ✅ |
 
 Plus the cross-cutting judge axes (from S1): **privacy-first** (the Confimarket
@@ -123,7 +123,7 @@ per-counterparty privacy + an auditor view by design.
 - [x] Economic flows & incentives — §1
 - [x] GTM outline + ICP — §3
 - [x] Demo script — §4
-- [ ] **Network-activity counter** on the dashboard (Day-4)
+- [x] **Network-activity counter** on the dashboard (routed notional + rebalance count, auditor view)
 - [ ] **Honest backtest** on historical CBTC funding/basis (Day-4) — needs data
 - [ ] **Submission video / writeup** per the final submission form (TBC format)
 - [ ] *(if onboarding lands)* swap mock venue adapters → real legs; deploy to testnet

@@ -49,6 +49,10 @@ class MockLedgerClient:
         )
         self._position = position
         self.actions: list[tuple[Action, object]] = []  # audit trail for the demo
+        # Network-activity metrics (the reward-pool story): every leg traded is
+        # routed notional on a Canton venue.
+        self.routed_notional: float = 0.0
+        self.rebalance_count: int = 0
 
     def get_vault(self) -> VaultState:
         return self._vault
@@ -59,6 +63,9 @@ class MockLedgerClient:
     def propose_rebalance(self, plan: RebalancePlan) -> str:
         self.actions.append((Action.PROPOSE, plan))
         # Simulate the operator approving + both legs filling equal-notional.
+        # Opening/resizing routes both legs => 2x the per-leg notional on-chain.
+        self.routed_notional += 2.0 * plan.notional
+        self.rebalance_count += 1
         self._position = PositionState(
             contract_id="mock-pos-1",
             underlying=plan.underlying,
@@ -70,7 +77,20 @@ class MockLedgerClient:
 
     def unwind(self, position_cid: str) -> None:
         self.actions.append((Action.UNWIND, position_cid))
+        # Closing both legs also routes their gross notional on-chain.
+        if self._position is not None:
+            self.routed_notional += self._position.gross_notional
+            self.rebalance_count += 1
         self._position = None
+
+    def metrics(self) -> dict[str, float]:
+        """Network-activity summary for the dashboard / reward-pool pitch."""
+        pos = self._position
+        return {
+            "routedNotional": round(self.routed_notional, 2),
+            "rebalanceCount": float(self.rebalance_count),
+            "openGrossNotional": pos.gross_notional if pos else 0.0,
+        }
 
 
 # --------------------------------------------------------------------------- #
