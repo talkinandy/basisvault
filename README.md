@@ -68,8 +68,8 @@ daml/Test/VaultTest.daml        deposit/redeem + privacy guarantee + delta-neutr
 docs/BUILD_PLAN.md              tailored MVP, 4-day plan, demo script, judging map
 docs/SCOPING.md                 feasibility + concept rationale
 docs/DEV_NOTES.md               SDK/version facts, Canton docs links, open blockers
-engine/                         (Day-3) off-chain strategy engine via the JSON Ledger API
-web/                            (Day-3) auditable-yield dashboard
+engine/                         off-chain strategy engine (carry logic + JSON Ledger API client)
+web/                            privacy-aware auditable-yield dashboard (FastAPI)
 ```
 
 ## Build & test
@@ -98,8 +98,17 @@ daml start          # sandbox + Navigator to click through deposit/privacy
 - **Day 2 ✅** — `RebalanceProposal_Approve` → short + long legs (mock adapters) →
   `DeltaNeutralPosition`, net-delta-≈0 guard, oracle-anchored mark, unwind (green).
   *Pending real PerpSwap/Helvet interfaces to replace the mock leg execution.*
-- **Day 3** — off-chain strategy engine (reuse BasisYield analytics/allocation) via the
-  JSON Ledger API; repoint the dashboard at live vault state.
+- **Day 3 ✅** — off-chain strategy engine (`engine/`: carry logic, sign-guard unwind,
+  stale/kill-switch guards, mock + JSON-Ledger-API clients, 12 tests green) + a
+  privacy-aware dashboard (`web/`: auditor/investor/outsider role views). Runs end-to-end
+  with zero creds via the mock ledger; `JsonLedgerClient` drops in once testnet access lands.
 - **Day 4** — backtest on historical CBTC funding/basis; demo script; volume counter for
   the network-reward-pool pitch.
 - **Stretch** — tokenized-RWA collateral leg → crosses into the RWA track.
+
+> **Venue reality (researched 2026-06-19):** the real, publicly-attested Canton
+> trading venues are **Canborsa** (perps), **Helvet Swap** (CBTC/CC AMM, early
+> access), **Cantex** (spot DEX), **Temple Lightspeed** (institutional CLOB), with
+> **Chainlink** oracles live (e.g. BitSafe). None publish open Daml interfaces or
+> testnet creds yet — both the on-chain venue legs and the engine's live ledger
+> client are built behind mock seams so the real adapters drop in unchanged.

@@ -1,0 +1,25 @@
+[project]
+name = "basisvault-engine"
+version = "0.1.0"
+description = "BasisVault off-chain delta-neutral carry strategy engine (Canton)"
+requires-python = ">=3.11"
+dependencies = []  # core (strategy + mock) is stdlib-only
+
+[project.optional-dependencies]
+ledger = ["httpx>=0.27"]          # real Canton JSON Ledger API client
+dashboard = ["fastapi>=0.110", "uvicorn>=0.29", "jinja2>=3.1"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+basisvault-engine = "basisvault_engine.engine:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["basisvault_engine*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
