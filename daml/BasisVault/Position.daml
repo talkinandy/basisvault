@@ -22,6 +22,8 @@ template DeltaNeutralPosition
     shortNotional : Decimal
     longNotional : Decimal
     markPrice : Decimal              -- oracle mark at open (not last-trade)
+    collateralAsset : Text          -- tokenized RWA backing the margin ("" if none)
+    collateralRate : Decimal        -- its base yield, earned WHILE it margins the carry
   where
     signatory operator
     observer manager, auditor

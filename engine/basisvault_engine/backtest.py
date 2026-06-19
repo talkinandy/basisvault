@@ -299,24 +299,169 @@ def run_rwa_backtest(
     )
 
 
+# --------------------------------------------------------------------------- #
+# STACKED backtest — the BasisYield mechanism on Canton: RWA-collateralized carry.
+# Two sleeves: (1) pure RWA (repo/MMF), (2) carry sleeve whose collateral is a
+# tokenized T-bill (earns base yield ALWAYS) AND margins a delta-neutral crypto
+# carry (collects funding when trailing funding is positive — sign-guarded).
+# The collateral-yield stacking is the Canton edge Hyperliquid lacks (idle USDC
+# earns 0 there). Honest: 1x notional (no leverage), realized funding only, real
+# turnover costs; reports a data-driven rolling-1y range across regimes.
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class StackedBacktestResult:
+    start: int
+    end: int
+    years: float
+    nav_start: float
+    nav_final: float
+    apy: float                    # blended portfolio
+    max_drawdown: float
+    carry_fraction: float
+    rwa_sleeve_apy: float
+    carry_sleeve_apy: float       # collateral + funding
+    carry_collateral_apy: float   # the T-bill base part of the carry sleeve
+    carry_funding_apy: float      # the funding-carry part of the carry sleeve
+    avg_funding_annual: float
+    pct_carry_deployed: float
+    annual_range: list[float]     # [min, median, max] rolling-1y blended return
+    today_apy: float              # trailing-1y blended (current regime)
+    nav_curve: list[list[float]]
+
+
+def _carry_forward(funding: list[FundingPoint], rates: list[RatePoint]
+                   ) -> list[tuple[float, float]]:
+    """For each funding time, the most recent (repo, mmf) rate at or before it."""
+    out: list[tuple[float, float]] = []
+    j = 0
+    repo = mmf = 0.0
+    for f in funding:
+        while j < len(rates) and rates[j].time <= f.time:
+            repo, mmf = rates[j].repo_rate, rates[j].mmf_rate
+            j += 1
+        out.append((repo, mmf))
+    return out
+
+
+def run_stacked_backtest(
+    funding: list[FundingPoint],
+    rates: list[RatePoint],
+    carry_fraction: float = 0.6,      # share of capital in the carry sleeve
+    nav_start: float = 1_000_000.0,
+    cost_bps: float = 1.0,
+    funding_ema_intervals: int = 9,
+    funding_entry: float = 0.02,      # annualized trailing funding to deploy carry
+    curve_points: int = 260,
+) -> StackedBacktestResult:
+    # overlap window only (need both funding and a known rate)
+    cf = _carry_forward(funding, rates)
+    pairs = [(f, r) for f, r in zip(funding, cf) if r[0] > 0 or r[1] > 0]
+    if len(pairs) < 2:
+        raise ValueError("need overlapping funding + rate history")
+
+    nav_rwa = nav_start * (1.0 - carry_fraction)
+    nav_carry = nav_start * carry_fraction
+    coll_gain = fund_gain = rwa_gain = 0.0
+    deployed = 0
+    cost = cost_bps / 10_000.0
+    ema: float | None = None
+    alpha = 2.0 / (funding_ema_intervals + 1.0)
+    was_deployed = False
+    navs: list[float] = []
+    times: list[int] = []
+
+    fps = [p[0] for p in pairs]
+    for i, (f, (repo, mmf)) in enumerate(pairs):
+        dt = ((fps[i + 1].time - f.time) / _MS_PER_YEAR) if i + 1 < len(pairs) else 0.0
+        base = mmf            # tokenized T-bill collateral / MMF base
+        rwa_base = (repo + mmf) / 2.0
+
+        # pure RWA sleeve
+        g = nav_rwa * rwa_base * dt
+        nav_rwa += g; rwa_gain += g
+
+        # carry sleeve: collateral always earns; funding when trailing-positive
+        gc = nav_carry * base * dt
+        nav_carry += gc; coll_gain += gc
+
+        ema = f.funding_rate if ema is None else alpha * f.funding_rate + (1 - alpha) * ema
+        deploy = ema * INTERVALS_PER_YEAR >= funding_entry
+        if deploy != was_deployed:
+            nav_carry -= nav_carry * cost   # turnover on (un)deploy
+            was_deployed = deploy
+        if deploy:
+            gf = nav_carry * f.funding_rate
+            nav_carry += gf; fund_gain += gf; deployed += 1
+
+        navs.append(nav_rwa + nav_carry)
+        times.append(f.time)
+
+    years = (pairs[-1][0].time - pairs[0][0].time) / _MS_PER_YEAR
+    nav_final = nav_rwa + nav_carry
+    apy = (nav_final / nav_start) ** (1.0 / years) - 1.0 if years > 0 else 0.0
+    rwa0 = nav_start * (1.0 - carry_fraction)
+    carry0 = nav_start * carry_fraction
+
+    def _ann(gain: float, principal: float) -> float:
+        return gain / principal / years if principal > 0 and years > 0 else 0.0
+
+    # rolling 1-year blended returns -> honest regime range
+    win = INTERVALS_PER_YEAR
+    roll = sorted((navs[k] / navs[k - win] - 1.0)
+                  for k in range(win, len(navs)) if navs[k - win] > 0)
+    if roll:
+        rng = [round(roll[0], 6), round(roll[len(roll) // 2], 6), round(roll[-1], 6)]
+        today = round(roll[-1], 6)
+    else:
+        rng = [round(apy, 6)] * 3
+        today = round(apy, 6)
+
+    return StackedBacktestResult(
+        start=pairs[0][0].time, end=pairs[-1][0].time, years=round(years, 3),
+        nav_start=nav_start, nav_final=round(nav_final, 2),
+        apy=round(apy, 6), max_drawdown=round(_max_drawdown(navs), 6),
+        carry_fraction=carry_fraction,
+        rwa_sleeve_apy=round((nav_rwa / rwa0) ** (1.0 / years) - 1.0, 6),
+        carry_sleeve_apy=round((nav_carry / carry0) ** (1.0 / years) - 1.0, 6),
+        carry_collateral_apy=round(_ann(coll_gain, carry0), 6),
+        carry_funding_apy=round(_ann(fund_gain, carry0), 6),
+        avg_funding_annual=round(sum(p[0].funding_rate for p in pairs) / len(pairs)
+                                 * INTERVALS_PER_YEAR, 6),
+        pct_carry_deployed=round(deployed / len(pairs), 4),
+        annual_range=rng, today_apy=today,
+        nav_curve=_downsample(times, navs, curve_points),
+    )
+
+
 def main() -> None:
     base = Path(__file__).resolve().parent.parent / "data"
 
     funding_path = base / "btc_funding.json"
-    if funding_path.exists():
-        res = run_backtest(load_funding(funding_path))
-        (base / "backtest_result.json").write_text(json.dumps(asdict(res)))
-        print(f"[basis/DN] {res.years:.2f}y  APY {res.apy:.2%}  maxDD {res.max_drawdown:.2%}  "
-              f"deployed {res.pct_time_deployed:.0%}  (naive {res.naive_always_on_apy:.2%} "
-              f"@ {res.naive_always_on_max_drawdown:.2%} maxDD)")
-
     rates_path = base / "rwa_rates.json"
-    if rates_path.exists():
-        r = run_rwa_backtest(load_rates(rates_path))
+    funding = load_funding(funding_path) if funding_path.exists() else []
+    rates = load_rates(rates_path) if rates_path.exists() else []
+
+    if funding:
+        res = run_backtest(funding)
+        (base / "backtest_result.json").write_text(json.dumps(asdict(res)))
+        print(f"[basis/DN]     {res.years:.2f}y  APY {res.apy:.2%}  maxDD {res.max_drawdown:.2%}  "
+              f"deployed {res.pct_time_deployed:.0%}")
+
+    if rates:
+        r = run_rwa_backtest(rates)
         (base / "rwa_backtest_result.json").write_text(json.dumps(asdict(r)))
         print(f"[RWA repo+MMF] {r.years:.2f}y  APY {r.apy:.2%}  maxDD {r.max_drawdown:.2%}  "
-              f"blended {r.avg_blended_yield:.2%}  deployed {r.pct_deployed:.0%}  "
-              f"rebalances {r.rebalances}  (avg repo {r.avg_repo_rate:.2%}, mmf {r.avg_mmf_rate:.2%})")
+              f"blended {r.avg_blended_yield:.2%}")
+
+    if funding and rates:
+        s = run_stacked_backtest(funding, rates)
+        (base / "stacked_backtest_result.json").write_text(json.dumps(asdict(s)))
+        lo, med, hi = (x * 100 for x in s.annual_range)
+        print(f"[STACKED RWA+carry] {s.years:.2f}y  APY {s.apy:.2%}  maxDD {s.max_drawdown:.2%}")
+        print(f"  carry sleeve {s.carry_sleeve_apy:.2%} = collateral {s.carry_collateral_apy:.2%} "
+              f"+ funding {s.carry_funding_apy:.2%}  |  RWA sleeve {s.rwa_sleeve_apy:.2%}")
+        print(f"  rolling-1y blended range: {lo:.1f}% / {med:.1f}% / {hi:.1f}%  (today {s.today_apy:.2%})  "
+              f"avg funding {s.avg_funding_annual:.2%}")
 
 
 if __name__ == "__main__":

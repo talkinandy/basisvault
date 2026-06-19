@@ -3,11 +3,14 @@ from __future__ import annotations
 
 import pytest
 
+import pytest
+
 from basisvault_engine.backtest import (
     FundingPoint,
     RatePoint,
     run_backtest,
     run_rwa_backtest,
+    run_stacked_backtest,
 )
 
 _8H = 8 * 3600 * 1000
@@ -89,6 +92,42 @@ def test_rwa_zero_rates_no_deployment_no_growth():
 
 
 def test_rwa_needs_two_points():
-    import pytest
     with pytest.raises(ValueError):
         run_rwa_backtest(rates(0.05, 0.045, 1))
+
+
+# --- stacked backtest (RWA-collateralized carry) ---
+def funding_const(fr: float, days: int) -> list[FundingPoint]:
+    return [FundingPoint(i * _8H, fr, 65_000.0) for i in range(3 * days)]
+
+
+def rates_const(repo: float, mmf: float, days: int) -> list[RatePoint]:
+    return [RatePoint(d * _DAY, repo, mmf) for d in range(days)]
+
+
+def test_stacked_positive_funding_stacks_collateral_plus_funding():
+    res = run_stacked_backtest(
+        funding_const(0.0001, 365), rates_const(0.05, 0.045, 365),
+        carry_fraction=0.6, cost_bps=0.0)
+    # collateral earns ~ the T-bill (mmf) rate; funding adds on top
+    assert res.carry_collateral_apy == pytest.approx(0.045, abs=0.006)
+    assert res.carry_funding_apy > 0.05
+    # the stacking: carry sleeve clears the pure-RWA sleeve
+    assert res.carry_sleeve_apy > res.rwa_sleeve_apy
+    assert res.rwa_sleeve_apy == pytest.approx(0.0475, abs=0.01)  # (repo+mmf)/2
+    assert res.max_drawdown < 0.005                                # market-neutral
+    assert res.annual_range[0] <= res.annual_range[1] <= res.annual_range[2]
+
+
+def test_stacked_negative_funding_falls_back_to_collateral_only():
+    res = run_stacked_backtest(
+        funding_const(-0.0001, 365), rates_const(0.05, 0.045, 365), cost_bps=1.0)
+    assert res.carry_funding_apy == pytest.approx(0.0, abs=0.002)   # sign guard
+    assert res.pct_carry_deployed < 0.05
+    assert res.carry_sleeve_apy == pytest.approx(res.carry_collateral_apy, abs=0.01)
+
+
+def test_stacked_needs_overlap():
+    with pytest.raises(ValueError):
+        run_stacked_backtest([FundingPoint(0, 0.0001, 65_000.0)],
+                             [RatePoint(0, 0.05, 0.045)])

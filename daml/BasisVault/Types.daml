@@ -45,4 +45,9 @@ data RebalancePlan = RebalancePlan
     shortVenue : Venue   -- e.g. PerpSwap — receive funding
     longVenue : Venue    -- e.g. HelvetSwap — cancel price
     notional : Decimal   -- equal-notional both legs ⇒ net delta ≈ 0
+    -- RWA-collateralized carry: the margin is a tokenized RWA (e.g. "USTB-3M")
+    -- earning `collateralRate` base yield WHILE it backs the carry — the Canton
+    -- edge (idle margin earns 0 on a crypto venue). "" / 0.0 = uncollateralized.
+    collateralAsset : Text
+    collateralRate : Decimal
   deriving (Eq, Show)

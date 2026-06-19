@@ -222,6 +222,8 @@ template RebalanceProposal
           shortLeg; longLeg
           shortNotional; longNotional
           markPrice = feed.price
+          collateralAsset = plan.collateralAsset   -- RWA-collateralized carry
+          collateralRate = plan.collateralRate
 
     choice RebalanceProposal_Reject : ()
       controller operator

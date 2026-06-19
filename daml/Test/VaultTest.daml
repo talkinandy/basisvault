@@ -115,6 +115,7 @@ testRebalance = do
   let plan = RebalancePlan with
         underlying = CBTC; shortVenue = PerpSwap; longVenue = HelvetSwap
         notional = 1000.0
+        collateralAsset = "USTB-3M"; collateralRate = 0.0464   -- RWA-collateralized
   proposal <- submit p.manager do
     exerciseCmd vault Vault_ProposeRebalance with plan
 
@@ -128,6 +129,8 @@ testRebalance = do
     Some pos -> do
       netDelta pos.longNotional pos.shortNotional === 0.0
       pos.markPrice === 65000.0
+      pos.collateralAsset === "USTB-3M"   -- carry is RWA-collateralized
+      pos.collateralRate === 0.0464
     None -> abort "delta-neutral position not found after approval"
 
   -- both legs opened, visible to the auditor; outsider sees nothing.

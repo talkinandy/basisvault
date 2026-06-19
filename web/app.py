@@ -82,17 +82,33 @@ def _portfolio() -> dict:
     }
 
 
-def _backtest() -> dict:
+def _pct(x: float) -> float:
+    return round(x * 100, 2)
+
+
+def _stacked() -> dict:
+    """The headline: RWA-collateralized carry (collateral T-bill yield + funding),
+    blended with a pure-RWA sleeve. Leads with the honest data-driven range."""
     try:
-        r = json.loads((_DATA / "rwa_backtest_result.json").read_text())
+        s = json.loads((_DATA / "stacked_backtest_result.json").read_text())
+        lo, med, hi = s["annual_range"]
         return {
-            "apyPct": round(r["apy"] * 100, 2),
-            "maxDrawdownPct": round(r["max_drawdown"] * 100, 2),
-            "avgBlendedYieldPct": round(r["avg_blended_yield"] * 100, 2),
-            "years": r["years"], "deployedPct": round(r["pct_deployed"] * 100, 1),
-            "rebalances": r["rebalances"], "navStart": r["nav_start"],
-            "navCurve": r["nav_curve"],
-            "source": "Real SOFR (repo) + 3M T-bill (MMF), 3y — public proxy for Canton RWA yields",
+            "blendedApyPct": _pct(s["apy"]),
+            "lowPct": _pct(lo), "highPct": _pct(hi),
+            "todayPct": _pct(s["today_apy"]),
+            "floorPct": _pct(s["carry_collateral_apy"]),       # ~ RWA base floor
+            "maxDrawdownPct": _pct(s["max_drawdown"]),
+            "years": s["years"],
+            "stacking": {
+                "rwaSleevePct": _pct(s["rwa_sleeve_apy"]),
+                "carrySleevePct": _pct(s["carry_sleeve_apy"]),
+                "collateralPct": _pct(s["carry_collateral_apy"]),
+                "fundingPct": _pct(s["carry_funding_apy"]),
+                "avgFundingPct": _pct(s["avg_funding_annual"]),
+                "carryFractionPct": _pct(s["carry_fraction"]),
+            },
+            "navCurve": s["nav_curve"], "navStart": s["nav_start"],
+            "source": "Real BTC funding (Binance) + SOFR/T-bill (FRED), 5y — public proxy for Canton RWA-collateralized carry",
         }
     except Exception:
         return {}
@@ -103,11 +119,10 @@ _client = _seed_client()
 
 def state_for(role: str) -> dict:
     port = _portfolio()
-    bt = _backtest()
     overview = {
         "aumUsd": AUM,
         "currentYieldPct": port["blendedYieldPct"],
-        "backtest": bt,
+        "stacked": _stacked(),
     }
     if role == "outsider":
         book = {"visible": False,

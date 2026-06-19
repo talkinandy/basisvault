@@ -61,18 +61,24 @@ proves the investor cannot see the strategy book — Canton need-to-know in acti
 
 ---
 
-## Proof: honest backtest on real rates
+## Proof: honest backtest on 5 years of real data
 
-The allocator replayed over **3 years of real SOFR (repo) + 3-month T-bill (MMF)**
-data — a transparent public proxy for Canton's tokenized-RWA yields:
+The headline is **RWA-collateralized carry** — the BasisYield (Hyperliquid)
+mechanism, made better by Canton: a delta-neutral carry whose **margin is a
+tokenized T-bill**, so the collateral earns base yield *while* it backs the trade
+(idle margin earns 0 on a crypto venue). Replayed over **5y of real BTC funding
+(Binance) + SOFR/3M-T-bill (FRED)**:
 
-| Strategy | APY | Max drawdown | Deployed | Notes |
-|---|---|---|---|---|
-| **RWA repo + MMF (hero)** | **4.45%** | **0.00%** | 94% | capital-preserving institutional yield |
-| Basis / delta-neutral (secondary) | 3.95% | 0.07% | 63% | BTC funding proxy; vs naive 4.84% @ 0.38% |
+| Strategy | APY (5y) | Max DD | Notes |
+|---|---|---|---|
+| **Stacked RWA-collateralized carry (headline)** | **8.7%** · rolling-1y range **4.5–14.5%** | **0.02%** | T-bill collateral **5.2%** + funding **10.0%** = carry sleeve **11.6%**; blended 60/40 with pure RWA |
+| Pure RWA repo + MMF | 3.4% | 0.00% | capital-preserving floor |
+| Delta-neutral basis only | 6.1% | 0.18% | funding carry, sign-guarded |
 
-Non-lookahead, real turnover costs, idle cash earns 0, **realized yield only**.
-Reproduce: `python -m basisvault_engine.backtest`.
+The collateral-yield **stacking** is the structural edge Hyperliquid can't offer.
+Non-lookahead, real turnover costs, sign-guarded funding, idle cash earns 0,
+**realized yield only**, 1× notional (no leverage). Funding is regime-dependent —
+the range is data-driven, not cherry-picked. Reproduce: `python -m basisvault_engine.backtest`.
 
 ## Status — all green
 
