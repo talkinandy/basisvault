@@ -43,20 +43,39 @@ export PATH="$HOME/.daml/bin:$PATH"
 - Release notes (Canton): https://docs.canton.network/global-synchronizer/release-notes/canton.md
 - Release notes (Splice): https://docs.canton.network/global-synchronizer/release-notes/splice.md
 
-## Open blockers — need from the logged-in AppsFactory/HackCanton page
+## HackCanton Season 2 — CONFIRMED (2026-06-19, registered)
 
-These are auth-gated; paste them in to unblock Day-2+:
+"HackCanton League" Season #2 — hosted by NODERS, online, **business-first**.
+Timeline (UTC):
 
-1. **Venue Daml interfaces** — `.dar`s or interface signatures for **PerpSwap**
-   (short leg), **Helvet Swap** (long leg), **Temple Lightspeed**. Without these,
-   only mock adapters are possible.
-2. **Testnet access** — JSON Ledger API endpoint + auth (party allocation,
-   JWT/token), shared devnet vs self-hosted LocalNet.
-3. **The SDK version HackCanton pins** (if a specific 3.5.x snapshot — for interop).
-4. **Oracle** — Chainlink vs RedStone on testnet; feed package/contract IDs for
-   CBTC marks + funding/basis.
-5. **Season-2 logistics** — live? deadline, prize pool, eligibility, submission format.
-6. **RWA stretch** — any tokenized-RWA collateral asset on testnet?
+| Phase | Dates | Notes |
+|---|---|---|
+| 1 · Registration & Team Formation | May 22 → Jul 3 | opening ceremony Jul 3, 15:00 |
+| 2 · Delivery | Jul 4 → Jul 26 | workshops, onboarding, mentor support; closing Jul 25, 15:00 |
+| **Submission deadline** | **Jul 25, 23:59 UTC** | |
+| 3 · Async Judging | Jul 27 → Aug 2 | Top 5–10 finalists announced Aug 2 |
+| 4 · Grand Final (Top 5–10) | Aug 3 → Aug 5 | live final Aug 5, 14:00 UTC |
+
+Prize pool: **TBA**. We're building during registration → ahead of schedule.
+
+**Tracks (S2 differ from S1):** RWA & Business Workflows · **Financial
+Applications: DeFi, Exchanges & Prediction Markets (our primary — "yield tool"
+is a listed example)** · Investment Infrastructure (Funds/DAOs/Governance) ·
+Data/Analytics/Dashboards · Open. See `SUBMISSION.md` for the deliverable map.
+
+## Open items (pursue via program onboarding / mentors during Delivery)
+
+The Delivery phase provides onboarding materials, quickstart, examples, and
+tech+business mentors — the likely channel to clear these:
+
+1. **Venue Daml interfaces** — `.dar`s/signatures for the real legs (Canborsa
+   perps, Helvet Swap AMM, Cantex spot, Temple CLOB). Until then: mock adapters.
+2. **Testnet access** — JSON Ledger API endpoint + auth (party allocation, JWT),
+   shared devnet vs self-hosted LocalNet.
+3. **SDK version** the program pins (if a specific 3.5.x snapshot — for interop).
+4. **Oracle** — Chainlink (live on Canton) feed package/contract IDs for CBTC
+   marks + funding/basis.
+5. **RWA stretch** — any tokenized-RWA collateral asset on testnet (RWA track).
 
 ## Reuse plan (Day-3, off-chain engine)
 

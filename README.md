@@ -7,7 +7,10 @@ long [Helvet Swap](https://docs.canton.network)/spot on the same underlying (CBT
 to ≈ 0 and the funding level is collected — and shows institutions a yield they can **audit**,
 while keeping positions **counterparty-private** via Canton's need-to-know disclosure.
 
-Built for **HackCanton** (AppsFactory + Canton Foundation + Noders). Primary track: **DeFi**.
+Built for **HackCanton League — Season 2** (hosted by NODERS). Track: **Financial
+Applications: DeFi, Exchanges & Prediction Markets**. **Submission deadline:
+2026-07-25 23:59 UTC** · Grand Final 2026-08-05. See [`docs/SUBMISSION.md`](docs/SUBMISSION.md)
+for the track-requirement map, economic flows, GTM, and demo script.
 
 ---
 
@@ -102,13 +105,16 @@ daml start          # sandbox + Navigator to click through deposit/privacy
   stale/kill-switch guards, mock + JSON-Ledger-API clients, 12 tests green) + a
   privacy-aware dashboard (`web/`: auditor/investor/outsider role views). Runs end-to-end
   with zero creds via the mock ledger; `JsonLedgerClient` drops in once testnet access lands.
-- **Day 4** — backtest on historical CBTC funding/basis; demo script; volume counter for
-  the network-reward-pool pitch.
+- **Day 4 (in progress)** — network-activity/volume counter on the dashboard; honest
+  backtest on historical CBTC funding/basis; demo script (drafted in `docs/SUBMISSION.md`).
+- **Submission packaging** — `docs/SUBMISSION.md`: track-requirement map, economic flows
+  & incentives, GTM + ICP, demo script, deliverable checklist.
 - **Stretch** — tokenized-RWA collateral leg → crosses into the RWA track.
 
 > **Venue reality (researched 2026-06-19):** the real, publicly-attested Canton
 > trading venues are **Canborsa** (perps), **Helvet Swap** (CBTC/CC AMM, early
 > access), **Cantex** (spot DEX), **Temple Lightspeed** (institutional CLOB), with
-> **Chainlink** oracles live (e.g. BitSafe). None publish open Daml interfaces or
-> testnet creds yet — both the on-chain venue legs and the engine's live ledger
-> client are built behind mock seams so the real adapters drop in unchanged.
+> **Chainlink** oracles live. None publish open Daml interfaces or testnet creds
+> yet (pursue via the Delivery-phase onboarding/mentors) — both the on-chain venue
+> legs and the engine's live ledger client are built behind mock seams so the real
+> adapters drop in unchanged.
