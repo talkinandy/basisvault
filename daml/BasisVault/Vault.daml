@@ -15,6 +15,7 @@ module BasisVault.Vault where
 import BasisVault.Types
 import BasisVault.Venue
 import BasisVault.Position
+import BasisVault.YieldSource
 
 -- Price per share; bootstraps to 1.0 when the vault is empty. Top-level so it
 -- is callable from any choice (a template-body `let` can't carry an inline type
@@ -66,8 +67,8 @@ template Vault
           totalShares = totalShares - sh.shares
         pure (v, amount)
 
-    -- Manager proposes a delta-neutral rebalance; operator approves (Day-2:
-    -- approval executes the legs via PerpSwap / Helvet adapters).
+    -- Manager proposes a delta-neutral rebalance; operator approves (the Basis
+    -- yield source — executes the legs via the venue adapters, see Venue.daml).
     nonconsuming choice Vault_ProposeRebalance : ContractId RebalanceProposal
       with
         plan : RebalancePlan
@@ -75,6 +76,49 @@ template Vault
       do
         create RebalanceProposal with
           operator; manager; auditor; vaultCid = self; plan
+
+    -- === RWA yield-source allocation workflow (the hero) ===
+    -- create: manager proposes allocating capital to a tokenized-RWA source
+    -- (repo / MMF / credit); operator approves at the rate feed.
+    nonconsuming choice Vault_ProposeAllocation : ContractId AllocationProposal
+      with
+        plan : AllocationPlan
+      controller manager
+      do
+        create AllocationProposal with
+          operator; manager; auditor; vaultCid = self; plan
+
+    -- update status: mark realized yield on an allocation at the oracle rate and
+    -- credit it to NAV. Repeatable; no phantom yield (only what `yearFraction`
+    -- at the marked rate actually earned). Returns the updated vault + allocation.
+    choice Vault_AccrueAllocation : (ContractId Vault, ContractId Allocation)
+      with
+        allocationCid : ContractId Allocation
+        rateFeedCid : ContractId RateFeed
+        yearFraction : Decimal
+      controller operator
+      do
+        alloc <- fetch allocationCid
+        feed <- fetch rateFeedCid
+        assertMsg "rate feed must match the allocation"
+          (feed.kind == alloc.kind && feed.asset == alloc.asset)
+        assertMsg "yearFraction must be in (0, 1]"
+          (yearFraction > 0.0 && yearFraction <= 1.0)
+        let earned = alloc.principal * feed.annualizedRate * yearFraction
+        archive allocationCid
+        newAlloc <- create alloc with
+          annualizedRate = feed.annualizedRate
+          accrued = alloc.accrued + earned
+        newVault <- create this with totalAssets = totalAssets + earned
+        pure (newVault, newAlloc)
+
+    -- fulfill: close an allocation (capital returns to idle NAV; realized yield
+    -- was already credited on accrual). nonconsuming — the vault lives on.
+    nonconsuming choice Vault_CloseAllocation : ()
+      with
+        allocationCid : ContractId Allocation
+      controller operator
+      do archive allocationCid
 
 -- An investor's claim on the vault. Visible only to that investor + the auditor.
 template ShareHolding
@@ -180,5 +224,37 @@ template RebalanceProposal
           markPrice = feed.price
 
     choice RebalanceProposal_Reject : ()
+      controller operator
+      do pure ()
+
+-- A manager-proposed RWA allocation awaiting operator approval. Approval at the
+-- rate feed creates the live Allocation (the "create" step of the RWA workflow).
+template AllocationProposal
+  with
+    operator : Party
+    manager : Party
+    auditor : Party
+    vaultCid : ContractId Vault
+    plan : AllocationPlan
+  where
+    signatory manager
+    observer operator, auditor
+
+    choice AllocationProposal_Approve : ContractId Allocation
+      with
+        rateFeedCid : ContractId RateFeed   -- oracle-anchored yield rate
+      controller operator
+      do
+        feed <- fetch rateFeedCid
+        assertMsg "rate feed must match the plan"
+          (feed.kind == plan.kind && feed.asset == plan.asset)
+        create Allocation with
+          operator; manager; auditor
+          kind = plan.kind; asset = plan.asset
+          principal = plan.principal
+          annualizedRate = feed.annualizedRate
+          accrued = 0.0
+
+    choice AllocationProposal_Reject : ()
       controller operator
       do pure ()

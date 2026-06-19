@@ -7,6 +7,7 @@ import DA.Assert ((===))
 import BasisVault.Vault
 import BasisVault.Venue
 import BasisVault.Position
+import BasisVault.YieldSource
 import BasisVault.Types
 
 data Parties = Parties
@@ -145,3 +146,55 @@ testRebalance = do
   assertMsg "legs closed after unwind" (null legsAfter)
   posAfter <- query @DeltaNeutralPosition p.operator
   assertMsg "position closed after unwind" (null posAfter)
+
+-- The RWA hero workflow: create -> update status (accrue) -> fulfill (close) ->
+-- audit. Manager proposes a tokenized-Treasury repo allocation; operator
+-- approves at the oracle rate; yield accrues to NAV (realized only); auditor
+-- sees the full book, outsider sees nothing; close returns capital to idle NAV.
+testAllocation : Script ()
+testAllocation = do
+  p <- setupParties
+  vault0 <- submit p.operator do
+    createCmd Vault with
+      operator = p.operator; manager = p.manager; auditor = p.auditor
+      underlying = CBTC; totalAssets = 1000000.0; totalShares = 1000000.0
+
+  -- oracle publishes a repo rate for a tokenized 3M T-bill: 5.25%/yr.
+  rate <- submit p.oracle do
+    createCmd RateFeed with
+      oracle = p.oracle; operator = p.operator
+      kind = Repo; asset = "USTB-3M"; annualizedRate = 0.0525
+
+  -- create: manager proposes allocating 800k to the repo source; operator approves.
+  let plan = AllocationPlan with kind = Repo; asset = "USTB-3M"; principal = 800000.0
+  prop <- submit p.manager do
+    exerciseCmd vault0 Vault_ProposeAllocation with plan
+  alloc0 <- submit p.operator do
+    exerciseCmd prop AllocationProposal_Approve with rateFeedCid = rate
+
+  -- update status: accrue one year of yield. NAV grows by 800k * 5.25% = 42k.
+  (vault1, alloc1) <- submit p.operator do
+    exerciseCmd vault0 Vault_AccrueAllocation with
+      allocationCid = alloc0; rateFeedCid = rate; yearFraction = 1.0
+  optV <- queryContractId p.operator vault1
+  case optV of
+    Some v -> v.totalAssets === 1042000.0   -- realized yield credited to NAV
+    None -> abort "vault missing after accrual"
+  optA <- queryContractId p.operator alloc1
+  case optA of
+    Some a -> a.accrued === 42000.0
+    None -> abort "allocation missing after accrual"
+
+  -- audit: auditor sees the allocation; investor/outsider do not.
+  auditorAllocs <- query @Allocation p.auditor
+  assertMsg "auditor sees the allocation" (length auditorAllocs == 1)
+  aliceAllocs <- query @Allocation p.alice
+  assertMsg "investor must NOT see the strategy allocation" (null aliceAllocs)
+  mAllocs <- query @Allocation p.mallory
+  assertMsg "outsider must NOT see any allocation" (null mAllocs)
+
+  -- fulfill: close the allocation; realized yield already in NAV, capital idle.
+  submit p.operator do
+    exerciseCmd vault1 Vault_CloseAllocation with allocationCid = alloc1
+  allocsAfter <- query @Allocation p.operator
+  assertMsg "allocation closed after fulfill" (null allocsAfter)

@@ -18,6 +18,25 @@ data Venue
 data Side = Long | Short
   deriving (Eq, Show)
 
+-- A vault yield source. RWA sources are the hero (Canton's flagship use case —
+-- tokenized-Treasury repo, money-market funds, credit); Basis (delta-neutral
+-- funding/basis carry) is kept as one secondary source.
+data YieldSourceKind
+  = Repo      -- tokenized-Treasury repo carry
+  | MMF       -- tokenized money-market-fund base yield
+  | Credit    -- tokenized credit (stretch)
+  | Basis     -- delta-neutral funding/basis carry (secondary)
+  deriving (Eq, Show)
+
+-- A proposed allocation of vault capital to an RWA yield source. Plain data so
+-- the off-chain allocator can hand it to the Vault to authorize.
+data AllocationPlan = AllocationPlan
+  with
+    kind : YieldSourceKind
+    asset : Text          -- tokenized RWA symbol, e.g. "USTB-3M", "MMF-USD"
+    principal : Decimal   -- quote units to deploy
+  deriving (Eq, Show)
+
 -- A proposed delta-neutral rebalance. Plain data (no ledger identity) so the
 -- off-chain strategy engine can hand it to the Vault to authorize.
 data RebalancePlan = RebalancePlan
