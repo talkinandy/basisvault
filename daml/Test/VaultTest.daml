@@ -1,0 +1,90 @@
+-- Day-1 acceptance: deposit/redeem accounting + the privacy guarantee.
+-- Run with `daml test` (or `daml start`).
+module Test.VaultTest where
+
+import Daml.Script
+import DA.Assert ((===))
+import BasisVault.Vault
+import BasisVault.Types
+
+data Parties = Parties
+  with
+    operator : Party
+    manager : Party
+    auditor : Party
+    alice : Party
+    mallory : Party
+
+setupParties : Script Parties
+setupParties = do
+  operator <- allocateParty "Operator"
+  manager  <- allocateParty "Manager"
+  auditor  <- allocateParty "Auditor"
+  alice    <- allocateParty "AliceInvestor"
+  mallory  <- allocateParty "MalloryOutsider"
+  pure Parties with ..
+
+-- Deposit mints shares 1:1 on a fresh vault, and burns return NAV.
+testDepositRedeem : Script ()
+testDepositRedeem = do
+  p <- setupParties
+  vault <- submit p.operator do
+    createCmd Vault with
+      operator = p.operator; manager = p.manager; auditor = p.auditor
+      underlying = CBTC; totalAssets = 0.0; totalShares = 0.0
+
+  -- Alice deposits 1000; operator accepts.
+  depReq <- submit p.alice do
+    createCmd DepositRequest with
+      operator = p.operator; investor = p.alice; amount = 1000.0; vaultCid = vault
+  (vault2, aliceShares) <- submit p.operator do
+    exerciseCmd depReq DepositRequest_Accept
+
+  -- pps bootstrapped at 1.0 ⇒ 1000 shares.
+  optSh <- queryContractId p.operator aliceShares
+  case optSh of
+    Some sh -> sh.shares === 1000.0
+    None -> abort "alice's holding not found"
+
+  -- Alice redeems; operator settles; she gets her 1000 back, vault empties.
+  redReq <- submit p.alice do
+    exerciseCmd aliceShares ShareHolding_RequestRedeem
+  (vault3, returned) <- submit p.operator do
+    exerciseCmd redReq RedeemRequest_Accept with vaultCid = vault2
+  returned === 1000.0
+  optV <- queryContractId p.operator vault3
+  case optV of
+    Some v -> do
+      v.totalShares === 0.0
+      v.totalAssets === 0.0
+    None -> abort "vault not found after redeem"
+
+-- The privacy guarantee: auditor sees all, investor sees only their own,
+-- an outsider sees NOTHING. This is the wedge for HackCanton judging.
+testPrivacy : Script ()
+testPrivacy = do
+  p <- setupParties
+  vault <- submit p.operator do
+    createCmd Vault with
+      operator = p.operator; manager = p.manager; auditor = p.auditor
+      underlying = CBTC; totalAssets = 0.0; totalShares = 0.0
+  depReq <- submit p.alice do
+    createCmd DepositRequest with
+      operator = p.operator; investor = p.alice; amount = 1000.0; vaultCid = vault
+  _ <- submit p.operator do exerciseCmd depReq DepositRequest_Accept
+
+  -- auditor: full visibility
+  auditorVaults <- query @Vault p.auditor
+  assertMsg "auditor sees the vault" (length auditorVaults == 1)
+  auditorHoldings <- query @ShareHolding p.auditor
+  assertMsg "auditor sees the holding" (length auditorHoldings == 1)
+
+  -- alice: only her own holding
+  aliceHoldings <- query @ShareHolding p.alice
+  assertMsg "alice sees her holding" (length aliceHoldings == 1)
+
+  -- mallory (outsider / counterparty): nothing at all
+  mVaults <- query @Vault p.mallory
+  assertMsg "outsider must NOT see the vault" (null mVaults)
+  mHoldings <- query @ShareHolding p.mallory
+  assertMsg "outsider must NOT see any holding" (null mHoldings)

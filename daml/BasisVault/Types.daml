@@ -1,0 +1,29 @@
+-- BasisVault shared types (no templates → safe to import anywhere).
+module BasisVault.Types where
+
+-- Underlying we run delta-neutral carry on.
+data Underlying
+  = CBTC          -- Canton BTC (Helvet Swap pair)
+  | CC            -- Canton Coin
+  | Tokenized Text  -- a tokenized RWA symbol, for the RWA-track stretch
+  deriving (Eq, Show)
+
+-- Where a leg executes (HackCanton venue stack).
+data Venue
+  = PerpSwap          -- levered swaps (the short funding leg)
+  | HelvetSwap        -- AMM, CBTC/CC (the long / spot leg)
+  | TempleLightspeed  -- institutional order book
+  deriving (Eq, Show)
+
+data Side = Long | Short
+  deriving (Eq, Show)
+
+-- A proposed delta-neutral rebalance. Plain data (no ledger identity) so the
+-- off-chain strategy engine can hand it to the Vault to authorize.
+data RebalancePlan = RebalancePlan
+  with
+    underlying : Underlying
+    shortVenue : Venue   -- e.g. PerpSwap — receive funding
+    longVenue : Venue    -- e.g. HelvetSwap — cancel price
+    notional : Decimal   -- equal-notional both legs ⇒ net delta ≈ 0
+  deriving (Eq, Show)

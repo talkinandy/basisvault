@@ -1,0 +1,22 @@
+# Daml build artifacts
+.daml/
+*.dar
+
+# Python (off-chain engine, Day-3)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Env / secrets — never commit ledger creds, JWTs, party tokens
+.env
+*.local
+*.key
+*.pem
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/

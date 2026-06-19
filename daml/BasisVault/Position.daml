@@ -1,0 +1,26 @@
+-- Day-2 stub: a live delta-neutral position, created when the operator approves
+-- a RebalanceProposal and the venue adapters (PerpSwap short + Helvet long) fill.
+-- Kept here so the structure is visible; not yet wired into Vault.
+module BasisVault.Position where
+
+import BasisVault.Types
+
+template DeltaNeutralPosition
+  with
+    operator : Party
+    manager : Party
+    auditor : Party
+    underlying : Underlying
+    shortNotional : Decimal   -- PerpSwap leg (receives funding)
+    longNotional : Decimal    -- Helvet/spot leg (cancels price)
+  where
+    signatory operator
+    observer manager, auditor
+    -- equal-notional hedge ⇒ net delta ≈ 0
+    ensure shortNotional >= 0.0 && longNotional >= 0.0
+
+    -- Day-2: unwind both legs when trailing funding turns negative (sign guard),
+    -- mirroring the BasisYield cash-carry auto-unwind.
+    choice DeltaNeutralPosition_Unwind : ()
+      controller operator
+      do pure ()  -- TODO Day-2: close legs via venue adapters

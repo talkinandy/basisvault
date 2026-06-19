@@ -1,0 +1,17 @@
+# BasisVault — HackCanton MVP
+# Pinned to Daml 3.x. Canton Network is Daml 3.x (mainnet on Canton 3.5.x /
+# Splice 0.6.x). 3.4.11 is the latest STABLE open-source SDK; per the Canton
+# docs (".dar files built by older 3.x Daml SDKs are generally compatible with
+# the Canton version used in this Splice release") it is the correct build
+# target for our greenfield vault contracts.
+# NOTE: if HackCanton's testnet pins a specific 3.5.x snapshot for venue
+# (PerpSwap/Helvet) interop, bump this and set build-options --target to match
+# their Daml-LF version (3.5 enables LF 2.3; 3.4 builds LF 2.2).
+sdk-version: 3.4.11
+name: basisvault
+version: 0.1.0
+source: daml
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-script
