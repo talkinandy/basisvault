@@ -3,9 +3,15 @@ from __future__ import annotations
 
 import pytest
 
-from basisvault_engine.backtest import FundingPoint, run_backtest
+from basisvault_engine.backtest import (
+    FundingPoint,
+    RatePoint,
+    run_backtest,
+    run_rwa_backtest,
+)
 
 _8H = 8 * 3600 * 1000
+_DAY = 86400 * 1000
 
 
 def series(rates: list[float]) -> list[FundingPoint]:
@@ -58,3 +64,31 @@ def test_needs_two_points():
 def test_deterministic():
     data = series([0.0005, -0.0002, 0.0007] * 40)
     assert run_backtest(data) == run_backtest(data)
+
+
+# --- RWA allocation backtest ---
+def rates(repo: float, mmf: float, days: int) -> list[RatePoint]:
+    return [RatePoint(i * _DAY, repo, mmf) for i in range(days)]
+
+
+def test_rwa_positive_rates_earn_with_no_drawdown():
+    res = run_rwa_backtest(rates(0.05, 0.045, 365), cost_bps=1.0)
+    assert res.apy > 0.0
+    assert res.max_drawdown == 0.0           # positive carry, capital-preserving
+    assert 0.90 <= res.pct_deployed <= 0.96  # ~95% deployed (5% cash buffer)
+    assert res.rebalances >= 1
+    # APY tracks the blended deployed yield, net of small turnover cost
+    assert abs(res.apy - res.avg_blended_yield) < 0.01
+
+
+def test_rwa_zero_rates_no_deployment_no_growth():
+    res = run_rwa_backtest(rates(0.0, 0.0, 200))
+    assert res.nav_final == res.nav_start
+    assert res.pct_deployed == 0.0
+    assert res.apy == 0.0
+
+
+def test_rwa_needs_two_points():
+    import pytest
+    with pytest.raises(ValueError):
+        run_rwa_backtest(rates(0.05, 0.045, 1))

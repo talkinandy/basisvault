@@ -22,7 +22,16 @@ import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from .models import Action, MarketSnapshot, PositionState, Underlying, VaultState
+from .allocator import AllocatorParams, blended_yield, needs_rebalance, target_allocation
+from .models import (
+    Action,
+    MarketSnapshot,
+    PositionState,
+    Underlying,
+    VaultState,
+    YieldQuote,
+    YieldSourceKind,
+)
 from .strategy import StrategyParams, decide
 
 INTERVALS_PER_YEAR = 3 * 365  # 8h funding => 3/day
@@ -186,19 +195,128 @@ def _downsample(times: list[int], navs: list[float], n: int) -> list[list[float]
     return out
 
 
+# --------------------------------------------------------------------------- #
+# RWA allocation backtest (the hero) — replay the allocator over real repo/MMF
+# rate history. Honest: yield is the blended rate ACTUALLY earned each day on the
+# deployed allocation; rebalances pay a turnover cost; idle cash earns 0.
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class RatePoint:
+    time: int          # ms epoch (daily)
+    repo_rate: float   # annualized fraction (SOFR proxy)
+    mmf_rate: float    # annualized fraction (3M T-bill proxy)
+
+
+@dataclass(frozen=True)
+class RwaBacktestResult:
+    start: int
+    end: int
+    years: float
+    nav_start: float
+    nav_final: float
+    total_return: float
+    apy: float
+    max_drawdown: float
+    avg_blended_yield: float
+    pct_deployed: float
+    rebalances: int
+    total_costs: float
+    avg_repo_rate: float
+    avg_mmf_rate: float
+    nav_curve: list[list[float]]
+
+
+def load_rates(path: str | Path) -> list[RatePoint]:
+    rows = json.loads(Path(path).read_text())
+    return [RatePoint(int(r["time"]), float(r["repo_rate"]), float(r["mmf_rate"]))
+            for r in rows]
+
+
+def run_rwa_backtest(
+    data: list[RatePoint],
+    params: AllocatorParams = AllocatorParams(),
+    nav_start: float = 1_000_000.0,
+    cost_bps: float = 1.0,            # turnover cost when the portfolio shifts
+    curve_points: int = 240,
+) -> RwaBacktestResult:
+    if len(data) < 2:
+        raise ValueError("need at least 2 rate points")
+
+    nav = nav_start
+    current: dict[str, float] = {}    # asset -> notional
+    rates_by_asset: dict[str, float] = {}
+    rebalances = 0
+    total_costs = 0.0
+    by_sum = deployed_sum = 0.0
+    cost = cost_bps / 10_000.0
+    navs: list[float] = []
+    times: list[int] = []
+
+    for i, pt in enumerate(data):
+        quotes = [
+            YieldQuote(YieldSourceKind.REPO, "USTB-3M", pt.repo_rate, 1.0),
+            YieldQuote(YieldSourceKind.MMF, "MMF-USD", pt.mmf_rate, 1.0),
+        ]
+        targets = target_allocation(quotes, nav, params)
+        rates_by_asset = {t.asset: t.annualized_rate for t in targets}
+
+        if needs_rebalance(current, targets, params):
+            tgt = {t.asset: t.target_notional for t in targets}
+            turnover = sum(abs(tgt.get(a, 0.0) - current.get(a, 0.0))
+                           for a in set(current) | set(tgt))
+            fee = turnover * cost
+            nav -= fee
+            total_costs += fee
+            current = tgt
+            rebalances += 1
+
+        # accrue today's yield on the deployed allocation (1 day)
+        dt_years = ((data[i + 1].time - pt.time) / _MS_PER_YEAR) if i + 1 < len(data) else 0.0
+        day_gain = sum(current.get(a, 0.0) * rates_by_asset.get(a, 0.0)
+                       for a in current) * dt_years
+        nav += day_gain
+
+        deployed = sum(current.values())
+        by_sum += blended_yield(targets, nav)
+        deployed_sum += deployed / nav if nav > 0 else 0.0
+        navs.append(nav)
+        times.append(pt.time)
+
+    years = (data[-1].time - data[0].time) / _MS_PER_YEAR
+    apy = (nav / nav_start) ** (1.0 / years) - 1.0 if years > 0 else 0.0
+    n = len(data)
+    return RwaBacktestResult(
+        start=data[0].time, end=data[-1].time, years=round(years, 3),
+        nav_start=nav_start, nav_final=round(nav, 2),
+        total_return=round(nav / nav_start - 1.0, 6), apy=round(apy, 6),
+        max_drawdown=round(_max_drawdown(navs), 6),
+        avg_blended_yield=round(by_sum / n, 6),
+        pct_deployed=round(deployed_sum / n, 4),
+        rebalances=rebalances, total_costs=round(total_costs, 2),
+        avg_repo_rate=round(sum(p.repo_rate for p in data) / n, 6),
+        avg_mmf_rate=round(sum(p.mmf_rate for p in data) / n, 6),
+        nav_curve=_downsample(times, navs, curve_points),
+    )
+
+
 def main() -> None:
-    data_path = Path(__file__).resolve().parent.parent / "data" / "btc_funding.json"
-    out_path = data_path.parent / "backtest_result.json"
-    data = load_funding(data_path)
-    res = run_backtest(data)
-    out_path.write_text(json.dumps(asdict(res)))
-    print(f"backtest: {res.years:.2f}y  APY {res.apy:.2%}  "
-          f"maxDD {res.max_drawdown:.2%}  deployed {res.pct_time_deployed:.0%}  "
-          f"opens/resizes/unwinds {res.opens}/{res.resizes}/{res.unwinds}")
-    print(f"  naive always-on: APY {res.naive_always_on_apy:.2%}  "
-          f"maxDD {res.naive_always_on_max_drawdown:.2%}  "
-          f"(strategy trades a little APY for ~{res.naive_always_on_max_drawdown/max(res.max_drawdown,1e-9):.0f}x less drawdown)")
-    print(f"  -> {out_path.relative_to(out_path.parent.parent)}")
+    base = Path(__file__).resolve().parent.parent / "data"
+
+    funding_path = base / "btc_funding.json"
+    if funding_path.exists():
+        res = run_backtest(load_funding(funding_path))
+        (base / "backtest_result.json").write_text(json.dumps(asdict(res)))
+        print(f"[basis/DN] {res.years:.2f}y  APY {res.apy:.2%}  maxDD {res.max_drawdown:.2%}  "
+              f"deployed {res.pct_time_deployed:.0%}  (naive {res.naive_always_on_apy:.2%} "
+              f"@ {res.naive_always_on_max_drawdown:.2%} maxDD)")
+
+    rates_path = base / "rwa_rates.json"
+    if rates_path.exists():
+        r = run_rwa_backtest(load_rates(rates_path))
+        (base / "rwa_backtest_result.json").write_text(json.dumps(asdict(r)))
+        print(f"[RWA repo+MMF] {r.years:.2f}y  APY {r.apy:.2%}  maxDD {r.max_drawdown:.2%}  "
+              f"blended {r.avg_blended_yield:.2%}  deployed {r.pct_deployed:.0%}  "
+              f"rebalances {r.rebalances}  (avg repo {r.avg_repo_rate:.2%}, mmf {r.avg_mmf_rate:.2%})")
 
 
 if __name__ == "__main__":

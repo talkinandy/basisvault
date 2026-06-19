@@ -28,6 +28,16 @@ class Side(str, Enum):
     SHORT = "Short"
 
 
+class YieldSourceKind(str, Enum):
+    """Mirrors the Daml `YieldSourceKind`. RWA sources are the hero; BASIS
+    (delta-neutral funding/basis carry) is the secondary source.
+    """
+    REPO = "Repo"       # tokenized-Treasury repo carry
+    MMF = "MMF"         # tokenized money-market-fund base yield
+    CREDIT = "Credit"   # tokenized credit (stretch)
+    BASIS = "Basis"     # delta-neutral funding/basis carry (secondary)
+
+
 class Action(str, Enum):
     PROPOSE = "PROPOSE"   # open / resize a delta-neutral pair
     HOLD = "HOLD"         # leave the book as-is
@@ -96,3 +106,37 @@ class Decision:
     action: Action
     plan: RebalancePlan | None
     reason: str
+
+
+# --------------------------------------------------------------------------- #
+# RWA yield-source allocation (the hero)
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class YieldQuote:
+    """An oracle-anchored annualized yield for one source, with a risk weight.
+
+    `annualized_rate` is the observed yield (repo rate, MMF yield, or the
+    delta-neutral basis carry). `risk_weight` in (0, 1] scales the source's cap
+    (1.0 = lowest risk, e.g. T-bill repo; lower for credit/basis).
+    """
+    kind: YieldSourceKind
+    asset: str
+    annualized_rate: float
+    risk_weight: float = 1.0
+
+
+@dataclass(frozen=True)
+class AllocationPlan:
+    """Mirrors the Daml `AllocationPlan` handed to Vault_ProposeAllocation."""
+    kind: YieldSourceKind
+    asset: str
+    principal: float
+
+
+@dataclass(frozen=True)
+class AllocationTarget:
+    """One line of the allocator's target portfolio."""
+    kind: YieldSourceKind
+    asset: str
+    annualized_rate: float
+    target_notional: float
