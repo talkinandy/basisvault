@@ -25,6 +25,7 @@ sys.path.insert(0, str(_ENGINE))
 
 from fastapi import FastAPI  # noqa: E402
 from fastapi.responses import HTMLResponse, JSONResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 from basisvault_engine.allocator import blended_yield, target_allocation  # noqa: E402
 from basisvault_engine.engine import tick  # noqa: E402
@@ -38,6 +39,7 @@ from basisvault_engine.models import (  # noqa: E402
 from basisvault_engine.strategy import expected_carry  # noqa: E402
 
 app = FastAPI(title="BasisYield on Canton")
+app.mount("/assets", StaticFiles(directory=str(_HERE / "assets")), name="assets")
 _DATA = _ENGINE / "data"
 _market = MarketSnapshot(Underlying.CBTC, 65_000.0, funding_rate=0.12, basis=0.01, age_seconds=5.0)
 AUM = 1_500_000.0

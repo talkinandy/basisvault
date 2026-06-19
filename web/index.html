@@ -35,7 +35,10 @@ a{color:inherit;text-decoration:none}
 .nav-in{display:flex;align-items:center;gap:14px;padding:14px 0}
 .brand{font-family:'Bricolage Grotesque';font-weight:800;font-size:21px;letter-spacing:-.03em;display:flex;align-items:center;gap:10px}
 .mark{width:34px;height:34px;border-radius:11px;background:var(--grad);color:#fff;display:grid;place-items:center;font-weight:800;font-size:19px;font-family:'Bricolage Grotesque';flex:none}
-.on-canton{font-size:12px;font-weight:700;color:var(--canton);background:rgba(29,111,106,.10);border:1px solid rgba(29,111,106,.22);border-radius:999px;padding:4px 10px}
+.built-on{display:inline-flex;align-items:center;gap:8px;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--faint)}
+.canton-logo{height:17px;width:auto;display:block}
+.built-on.divider{padding-left:14px;border-left:1px solid var(--line)}
+.tmnotice{font-size:11.5px;color:var(--faint);line-height:1.5;margin-top:14px;max-width:760px}
 .nav-spacer{flex:1}
 .pill{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px}
 .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
@@ -151,7 +154,7 @@ a{color:inherit;text-decoration:none}
 
 <nav class="nav"><div class="wrap nav-in">
   <div class="brand"><span class="mark">B</span>BasisYield</div>
-  <span class="on-canton">on Canton Network</span>
+  <span class="built-on divider">Built on <img src="/assets/canton-logo-black.svg" alt="Canton Network" class="canton-logo"></span>
   <div class="nav-spacer"></div>
   <span class="pill"><span class="dot"></span>Live demo · testnet-ready</span>
   <a class="btn btn-ghost" href="#how">How it works</a>
@@ -286,10 +289,16 @@ a{color:inherit;text-decoration:none}
     a yield source behind the same on-chain workflow you see above.</p>
 </div></section>
 
-<div class="wrap"><div class="footer">
-  <div class="brand" style="font-size:17px"><span class="mark" style="width:28px;height:28px;font-size:16px">B</span>BasisYield · on Canton</div>
-  <div>HackCanton League S2 · DeFi/RWA · <span class="demobadge">demo — mock seams, testnet-ready</span></div>
-</div></div>
+<div class="wrap">
+  <div class="footer">
+    <div class="brand" style="font-size:17px"><span class="mark" style="width:28px;height:28px;font-size:16px">B</span>BasisYield</div>
+    <span class="built-on">Built on <img src="/assets/canton-logo-black.svg" alt="Canton Network" class="canton-logo" style="height:20px"></span>
+    <div>HackCanton League S2 · <span class="demobadge">demo — mock seams, testnet-ready</span></div>
+  </div>
+  <p class="tmnotice">Canton is a registered trademark of Digital Asset (Switzerland) GmbH. Digital Asset
+    is not affiliated with, and has not sponsored or endorsed, BasisYield. Demonstration project for
+    HackCanton League S2 — not an offer of any financial product.</p>
+</div>
 
 <script>
 const $=s=>document.querySelector(s);
