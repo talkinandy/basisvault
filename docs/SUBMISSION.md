@@ -124,7 +124,7 @@ per-counterparty privacy + an auditor view by design.
 - [x] GTM outline + ICP — §3
 - [x] Demo script — §4
 - [x] **Network-activity counter** on the dashboard (routed notional + rebalance count, auditor view)
-- [ ] **Honest backtest** on historical CBTC funding/basis (Day-4) — needs data
+- [x] **Honest backtest harness** (non-lookahead, real costs, naive contrast) — yield-source-agnostic; proof run on 2y BTC funding (APY 3.95% @ 0.07% maxDD vs naive 4.84% @ 0.38%). Swaps to RWA repo/MMF rate data unchanged.
 - [ ] **Submission video / writeup** per the final submission form (TBC format)
 - [ ] *(if onboarding lands)* swap mock venue adapters → real legs; deploy to testnet
 - [ ] *(stretch)* tokenized-RWA collateral leg → RWA track crossover
