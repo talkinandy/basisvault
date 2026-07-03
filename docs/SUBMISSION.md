@@ -22,7 +22,7 @@ The RWA & Business Workflows track asks for four things:
 | Required | BasisVault delivers | Status |
 |---|---|---|
 | **MVP: ≥1 end-to-end workflow** (create → update status → transfer/fulfill → audit/report) | full chain on-chain: `ProposeAllocation`→`Approve` (create) → `AccrueAllocation` (update) → **`ShareHolding_ProposeTransfer`→`Accept`→`Settle` (transfer)** → `CloseAllocation`/redeem (fulfill) → observer sees all (audit). 6 Daml scripts green | ✅ |
-| **Lightweight UI demonstrating roles** (issuer / holder / observer) | the **"Run it yourself" lifecycle panel** on the live site — click through all 6 steps, live state strip, every event names its Daml choice, feed re-filters by Issuer/Holder/Observer/Outsider; plus the privacy book demo | ✅ live |
+| **Lightweight UI demonstrating roles** (issuer / holder / observer) | the **"Run it yourself" lifecycle panel** on the live site — click through all 6 steps **executing as real Daml transactions on a Canton ledger** (sandbox + JSON Ledger API v2): real tx ids on every event, and the per-role contract counts are the ledger's own ACS answers — **need-to-know enforced by Canton, not the UI**. Mock fallback if the sandbox is down | ✅ live, on-ledger |
 | **1-page business brief** (ICP, use case, who pays, why Canton) | standalone [`BUSINESS_BRIEF.md`](BUSINESS_BRIEF.md) (§3 below is the long form) | ✅ |
 | **Short pilot plan** (2–3 steps + required integrations) | standalone [`PILOT_PLAN.md`](PILOT_PLAN.md) (§4 below is the summary) | ✅ |
 

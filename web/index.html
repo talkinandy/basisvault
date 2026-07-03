@@ -452,19 +452,22 @@ function renderLC(s){
     const cls=i<s.done?'done':(st===s.next?'next':'');
     return `<span class="lc-step ${cls}">${i<s.done?'✓ ':''}${STEP_LABELS[st]||st}</span>`;
   }).join('');
-  const m=s.state;
+  const m=s.state, lg=s.ledger||{};
+  const ledgerPill=lg.live
+    ?`<div class="m"><div class="v" style="color:var(--canton);font-size:15px">⛓ live Canton ledger</div><div class="l">${lg.visibleContracts??0} contract(s) visible to this role — enforced by the ledger, not the UI</div></div>`
+    :`<div class="m"><div class="v" style="color:var(--faint);font-size:15px">mock driver</div><div class="l">sandbox offline — same workflow, simulated</div></div>`;
   $('#lc-strip').innerHTML=[
     ['Vault AUM',fmtUsd(m.aumUsd)],['NAV / share',m.navPerShare.toFixed(4)],
     ['Alice holds',fmtUsd(m.aliceUsd)],['Bob holds',fmtUsd(m.bobUsd)],
     ['Yield realized',fmtUsd(m.accruedUsd)]
-  ].map(([l,v])=>`<div class="m"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+  ].map(([l,v])=>`<div class="m"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('')+ledgerPill;
   let feed='';
   if(s.role==='outsider'){
     feed=`<div class="lc-hidden">🔒 ${s.hiddenCount||s.events.length+s.hiddenCount} on-chain event(s) exist — an outsider sees none of them.</div>`;
     if(!s.hiddenCount&&!s.events.length) feed=`<div class="lc-empty">Press ▶ Next step — an outsider will still see nothing.</div>`;
   }else{
     feed=[...s.events].reverse().map(e=>`<div class="lc-ev"><div class="t">${e.title}</div>
-      <div class="d">${e.detail}</div><div class="daml">⛓ ${e.daml}</div></div>`).join('');
+      <div class="d">${e.detail}</div><div class="daml">⛓ ${e.daml}${e.updateId?` · <span title="${e.updateId}">tx ${e.updateId.slice(0,14)}…</span>`:''}</div></div>`).join('');
     if(s.hiddenCount>0) feed+=`<div class="lc-hidden">🔒 ${s.hiddenCount} event(s) hidden from the ${s.role} — need-to-know</div>`;
     if(!s.events.length&&!s.hiddenCount) feed=`<div class="lc-empty">Press ▶ Next step to run the first on-chain move.</div>`;
   }

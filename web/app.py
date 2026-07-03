@@ -38,7 +38,11 @@ from basisvault_engine.models import (  # noqa: E402
 )
 from basisvault_engine.strategy import expected_carry  # noqa: E402
 
+sys.path.insert(0, str(_HERE))
+from ledger_bridge import LedgerBridge  # noqa: E402
+
 app = FastAPI(title="BasisYield on Canton")
+BRIDGE = LedgerBridge()
 app.mount("/assets", StaticFiles(directory=str(_HERE / "assets")), name="assets")
 _DATA = _ENGINE / "data"
 _market = MarketSnapshot(Underlying.CBTC, 65_000.0, funding_rate=0.12, basis=0.01, age_seconds=5.0)
@@ -177,21 +181,27 @@ LC_ROLES = ("issuer", "holder", "observer", "outsider")
 LC_STEPS = ["deposit", "allocate", "accrue", "transfer", "close", "redeem"]
 
 
-def _fresh_lc() -> dict:
+LC_ROLE_PARTY = {"issuer": "operator", "holder": "alice",
+                 "observer": "auditor", "outsider": "mallory"}
+
+
+def _fresh_lc(mode: str = "mock") -> dict:
     return {"i": 0, "aum": 0.0, "shares": 0.0, "alice": 0.0, "bob": 0.0,
-            "allocs": [], "accrued": 0.0, "events": []}
+            "allocs": [], "accrued": 0.0, "events": [], "mode": mode}
 
 
-_LC = _fresh_lc()
+_LC = _fresh_lc("ledger" if BRIDGE.ensure() else "mock")
 
 
 def _lc_pps() -> float:
     return _LC["aum"] / _LC["shares"] if _LC["shares"] > 0 else 1.0
 
 
-def _lc_event(step: str, title: str, detail: str, daml: str, visible: list[str]) -> None:
+def _lc_event(step: str, title: str, detail: str, daml: str, visible: list[str],
+              update_id: str | None = None) -> None:
     _LC["events"].append({"step": step, "title": title, "detail": detail,
-                          "daml": daml, "visibleTo": visible})
+                          "daml": daml, "visibleTo": visible,
+                          "updateId": update_id})
 
 
 def _lc_run(step: str) -> None:
@@ -248,6 +258,112 @@ def _lc_run(step: str) -> None:
         _LC["bob"] = 0.0
 
 
+def _lc_sync_from_ledger() -> None:
+    """Refresh the state strip numbers from the REAL ledger's ACS."""
+    v = BRIDGE.vault()
+    _LC["aum"] = float(v["arg"]["totalAssets"]) if v else 0.0
+    _LC["shares"] = float(v["arg"]["totalShares"]) if v else 0.0
+    _LC["alice"] = sum(float(h["arg"]["shares"]) for h in BRIDGE.find("alice", "ShareHolding"))
+    _LC["bob"] = sum(float(h["arg"]["shares"]) for h in BRIDGE.find("bob", "ShareHolding"))
+
+
+def _lc_run_ledger(step: str) -> None:
+    """Run one lifecycle step as REAL Daml transactions on the sandbox."""
+    br = BRIDGE
+    repo, mmf = _latest_rates()
+    if step == "deposit":
+        r1 = br.create("alice", "DepositRequest", {
+            "operator": br.party["operator"], "investor": br.party["alice"],
+            "amount": "1000000.0", "vaultCid": br.vault_cid()})
+        dep = next(c for c in r1["created"] if c["entity"] == "DepositRequest")
+        r2 = br.exercise("operator", "DepositRequest", dep["cid"], "DepositRequest_Accept")
+        _lc_event(step, "Alice deposits $1.00M", "1,000,000 shares minted at NAV/share 1.0000",
+                  "DepositRequest_Accept → Vault_MintShares",
+                  ["issuer", "holder", "observer"], r2["updateId"])
+    elif step == "allocate":
+        quotes = [
+            YieldQuote(YieldSourceKind.REPO, "USTB-3M", repo, 1.0),
+            YieldQuote(YieldSourceKind.MMF, "MMF-USD", mmf, 1.0),
+        ]
+        kinds = {"USTB-3M": ("Repo", "tokenized-Treasury repo"),
+                 "MMF-USD": ("MMF", "tokenized money-market fund")}
+        for t in target_allocation(quotes, _lc_vault_aum()):
+            tag, label = kinds[t.asset]
+            br.create("oracle", "RateFeed", {
+                "oracle": br.party["oracle"], "operator": br.party["operator"],
+                "kind": tag, "asset": t.asset,
+                "annualizedRate": f"{t.annualized_rate:.10f}"},
+                module="BasisVault.YieldSource")
+            rp = br.exercise("manager", "Vault", br.vault_cid(), "Vault_ProposeAllocation",
+                             {"plan": {"kind": tag, "asset": t.asset,
+                                       "principal": f"{t.target_notional:.2f}"}})
+            prop = next(c for c in rp["created"] if c["entity"] == "AllocationProposal")
+            feed = next(f for f in br.find("oracle", "RateFeed") if f["arg"]["asset"] == t.asset)
+            ra = br.exercise("operator", "AllocationProposal", prop["cid"],
+                             "AllocationProposal_Approve", {"rateFeedCid": feed["cid"]})
+            _lc_event(step, f"Allocate ${t.target_notional/1e6:.2f}M → {t.asset} ({label})",
+                      f"approved at the oracle rate {t.annualized_rate*100:.2f}%/yr",
+                      "Vault_ProposeAllocation → AllocationProposal_Approve",
+                      ["issuer", "observer"], ra["updateId"])
+    elif step == "accrue":
+        total = 0.0
+        last_up = None
+        for alloc in br.find("operator", "Allocation"):
+            feed = next(f for f in br.find("oracle", "RateFeed")
+                        if f["arg"]["asset"] == alloc["arg"]["asset"])
+            r = br.exercise("operator", "Vault", br.vault_cid(), "Vault_AccrueAllocation",
+                            {"allocationCid": alloc["cid"], "rateFeedCid": feed["cid"],
+                             "yearFraction": "0.25"})
+            total += float(alloc["arg"]["principal"]) * float(feed["arg"]["annualizedRate"]) * 0.25
+            last_up = r["updateId"]
+        _LC["accrued"] += total
+        _lc_sync_from_ledger()
+        _lc_event(step, f"One quarter of yield accrues: +${total:,.0f}",
+                  f"realized only — principal × oracle rate × 0.25y; NAV/share → {_lc_pps():.4f}",
+                  "Vault_AccrueAllocation", ["issuer", "observer"], last_up)
+        _lc_event(step, "Your holding grew",
+                  f"your {_LC['alice']:,.0f} shares are now worth ${_LC['alice']*_lc_pps():,.0f}",
+                  "(your view of the same accrual)", ["holder"], last_up)
+    elif step == "transfer":
+        hold = br.find("alice", "ShareHolding")[0]
+        rp = br.exercise("alice", "ShareHolding", hold["cid"], "ShareHolding_ProposeTransfer",
+                         {"newHolder": br.party["bob"]})
+        prop = next(c for c in rp["created"] if c["entity"] == "TransferProposal")
+        ra = br.exercise("bob", "TransferProposal", prop["cid"], "TransferProposal_Accept")
+        acc = next(c for c in ra["created"] if c["entity"] == "AcceptedTransfer")
+        rs = br.exercise("operator", "AcceptedTransfer", acc["cid"], "AcceptedTransfer_Settle")
+        _lc_event(step, "Alice transfers her holding to Bob",
+                  "propose → Bob accepts → issuer settles; share count unchanged. "
+                  "Only Alice, Bob, issuer and the observer ever see this.",
+                  "ShareHolding_ProposeTransfer → TransferProposal_Accept → AcceptedTransfer_Settle",
+                  ["issuer", "holder", "observer"], rs["updateId"])
+    elif step == "close":
+        last_up = None
+        for alloc in br.find("operator", "Allocation"):
+            r = br.exercise("operator", "Vault", br.vault_cid(), "Vault_CloseAllocation",
+                            {"allocationCid": alloc["cid"]})
+            last_up = r["updateId"]
+        _lc_event(step, "Allocations closed — capital back to idle NAV",
+                  f"realized yield (${_LC['accrued']:,.0f}) already in NAV; nothing invented",
+                  "Vault_CloseAllocation", ["issuer", "observer"], last_up)
+    elif step == "redeem":
+        hold = br.find("bob", "ShareHolding")[0]
+        value = float(hold["arg"]["shares"]) * _lc_pps()
+        rr = br.exercise("bob", "ShareHolding", hold["cid"], "ShareHolding_RequestRedeem")
+        req = next(c for c in rr["created"] if c["entity"] == "RedeemRequest")
+        r = br.exercise("operator", "RedeemRequest", req["cid"], "RedeemRequest_Accept",
+                        {"vaultCid": br.vault_cid()})
+        _lc_event(step, f"Bob redeems at the higher NAV: ${value:,.0f}",
+                  f"entered via transfer at NAV/share {_lc_pps():.4f} — yield travelled with the shares",
+                  "RedeemRequest_Accept → Vault_BurnShares", ["issuer", "observer"], r["updateId"])
+    _lc_sync_from_ledger()
+
+
+def _lc_vault_aum() -> float:
+    v = BRIDGE.vault()
+    return float(v["arg"]["totalAssets"]) if v else 0.0
+
+
 def _lc_view(role: str) -> dict:
     # issuer signs everything and the observer audits everything — they see ALL
     # events (the whole thesis); the holder sees only their own; outsider none.
@@ -268,7 +384,21 @@ def _lc_view(role: str) -> dict:
                   "accruedUsd": rnd(_LC["accrued"])},
         "events": visible, "hiddenCount": hidden,
         "role": role,
+        "ledger": _lc_ledger_info(role),
     }
+
+
+def _lc_ledger_info(role: str) -> dict:
+    """Proof block: is this running on a real Canton ledger, and how many
+    contracts can THIS role's party actually see on it (Canton-enforced)."""
+    if _LC["mode"] != "ledger":
+        return {"live": False}
+    try:
+        n = len(BRIDGE.acs(LC_ROLE_PARTY[role]))
+        return {"live": True, "visibleContracts": n,
+                "participant": "canton sandbox · JSON Ledger API v2"}
+    except Exception:
+        return {"live": False}
 
 
 @app.get("/api/lifecycle")
@@ -281,7 +411,18 @@ def api_lifecycle(role: str = "observer") -> JSONResponse:
 @app.post("/api/lifecycle/next")
 def api_lifecycle_next(role: str = "observer") -> JSONResponse:
     if _LC["i"] < len(LC_STEPS):
-        _lc_run(LC_STEPS[_LC["i"]])
+        step = LC_STEPS[_LC["i"]]
+        if _LC["i"] == 0 and _LC["mode"] != "ledger" and BRIDGE.ensure():
+            _LC["mode"] = "ledger"  # sandbox came up after the app — upgrade
+        if _LC["mode"] == "ledger" and BRIDGE.ensure():
+            try:
+                _lc_run_ledger(step)
+            except Exception as e:
+                return JSONResponse({**_lc_view(role), "ledgerError": str(e)[:300]},
+                                    status_code=502)
+        else:
+            _LC["mode"] = "mock"
+            _lc_run(step)
         _LC["i"] += 1
     return JSONResponse(_lc_view(role))
 
@@ -289,7 +430,11 @@ def api_lifecycle_next(role: str = "observer") -> JSONResponse:
 @app.post("/api/lifecycle/reset")
 def api_lifecycle_reset(role: str = "observer") -> JSONResponse:
     global _LC
-    _LC = _fresh_lc()
+    if BRIDGE.ensure():
+        BRIDGE.reset()
+        _LC = _fresh_lc("ledger")
+    else:
+        _LC = _fresh_lc("mock")
     return JSONResponse(_lc_view(role))
 
 
