@@ -20,3 +20,6 @@ venv/
 *.swp
 .idea/
 .vscode/
+
+# Canton sandbox logs (service WorkingDirectory)
+log/
