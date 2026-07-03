@@ -128,6 +128,28 @@ a{color:inherit;text-decoration:none}
 .rm h4{font-family:'Bricolage Grotesque';font-weight:800;font-size:16px;margin:8px 0 4px}
 .rm p{font-size:13.5px;color:var(--muted)}
 
+/* lifecycle runner */
+.lc{background:var(--surface);border:1.5px solid var(--ink);border-radius:24px;padding:28px;box-shadow:var(--shadow-md)}
+.lc-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.lc-steps{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 4px}
+.lc-step{font-size:12.5px;font-weight:800;padding:7px 13px;border-radius:999px;border:1.5px solid var(--line2);color:var(--faint);background:var(--bg)}
+.lc-step.done{background:var(--greensoft);border-color:var(--green);color:var(--green)}
+.lc-step.next{background:var(--ink);border-color:var(--ink);color:#fff}
+.lc-ctl{display:flex;gap:10px;margin:14px 0 4px;flex-wrap:wrap;align-items:center}
+.lc-roles{display:inline-flex;background:var(--bg);border:1px solid var(--line2);border-radius:999px;padding:4px;gap:2px;flex-wrap:wrap}
+.lc-roles button{font-family:inherit;font-weight:700;font-size:13px;color:var(--muted);background:transparent;border:none;border-radius:999px;padding:7px 13px;cursor:pointer}
+.lc-roles button.on{background:var(--ink);color:#fff}
+.lc-strip{display:flex;gap:22px;flex-wrap:wrap;margin:16px 0 6px;padding:14px 16px;background:var(--bg);border:1px solid var(--line);border-radius:14px}
+.lc-strip .m .v{font-family:'Bricolage Grotesque';font-weight:800;font-size:20px}
+.lc-strip .m .l{font-size:11.5px;font-weight:700;color:var(--faint)}
+.lc-feed{margin-top:12px;display:flex;flex-direction:column;gap:9px;min-height:120px}
+.lc-ev{border:1px solid var(--line);border-left:3.5px solid var(--green);border-radius:12px;padding:12px 14px;background:#fff;animation:fc-rise .4s ease both}
+.lc-ev .t{font-weight:800;font-size:14.5px}
+.lc-ev .d{font-size:13px;color:var(--muted);margin-top:2px}
+.lc-ev .daml{font-family:'IBM Plex Mono';font-size:11.5px;color:var(--canton);margin-top:6px;font-weight:600}
+.lc-hidden{font-size:12.5px;font-weight:700;color:var(--faint);border:1.5px dashed var(--line2);border-radius:12px;padding:10px 14px;text-align:center}
+.lc-empty{color:var(--faint);font-size:14px;text-align:center;padding:26px 0}
+@keyframes fc-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 /* stacking */
 .stackgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:26px}
 @media(max-width:820px){.stackgrid{grid-template-columns:1fr}}
@@ -203,6 +225,30 @@ a{color:inherit;text-decoration:none}
   </div>
 </div></section>
 
+<section class="section" id="workflow"><div class="wrap">
+  <span class="kicker">Run it yourself</span>
+  <h2 class="h2" style="margin:10px 0 4px">The whole lifecycle, step by step.</h2>
+  <p class="lead" style="max-width:62ch">Create → update status → transfer → fulfill — with the audit
+    trail live. Every step names the exact on-chain Daml choice it exercises, and the feed you see
+    depends on <b>who you are</b>.</p>
+  <div class="lc" style="margin-top:24px">
+    <div class="lc-top">
+      <button class="btn btn-accent" id="lc-next">▶ Next step</button>
+      <button class="btn btn-ghost" id="lc-reset">↺ Reset</button>
+      <div class="nav-spacer" style="flex:1"></div>
+      <div class="lc-roles" id="lc-roles">
+        <button data-r="observer" class="on">Observer · auditor</button>
+        <button data-r="issuer">Issuer · operator</button>
+        <button data-r="holder">Holder · Alice</button>
+        <button data-r="outsider">Outsider</button>
+      </div>
+    </div>
+    <div class="lc-steps" id="lc-steps"></div>
+    <div class="lc-strip" id="lc-strip"></div>
+    <div class="lc-feed" id="lc-feed"></div>
+  </div>
+</div></section>
+
 <section class="section" id="stack"><div class="wrap">
   <span class="kicker">Where the yield comes from</span>
   <h2 class="h2" style="margin:10px 0 4px">Your collateral works twice.</h2>
@@ -241,8 +287,8 @@ a{color:inherit;text-decoration:none}
       <b>need-to-know</b> basis. Switch the viewer and watch the <b>live book</b> change — this is
       what regulated capital needs and a public chain can't give.</p>
     <div class="seg" id="seg">
-      <button data-r="auditor" class="on">Auditor · observer</button>
-      <button data-r="investor">Investor · holder</button>
+      <button data-r="auditor" class="on">Observer · auditor</button>
+      <button data-r="investor">Holder · investor</button>
       <button data-r="outsider">Outsider</button>
     </div>
     <div class="book" id="book"><div class="lockmsg">Loading…</div></div>
@@ -397,5 +443,43 @@ async function load(role){
 }
 document.querySelectorAll('#seg button').forEach(b=>b.onclick=()=>load(b.dataset.r));
 load('auditor');
+
+/* ---- lifecycle runner ---- */
+let lcRole='observer';
+const STEP_LABELS={deposit:'1 · Deposit',allocate:'2 · Allocate',accrue:'3 · Accrue',transfer:'4 · Transfer',close:'5 · Fulfill',redeem:'6 · Redeem'};
+function renderLC(s){
+  $('#lc-steps').innerHTML=s.steps.map((st,i)=>{
+    const cls=i<s.done?'done':(st===s.next?'next':'');
+    return `<span class="lc-step ${cls}">${i<s.done?'✓ ':''}${STEP_LABELS[st]||st}</span>`;
+  }).join('');
+  const m=s.state;
+  $('#lc-strip').innerHTML=[
+    ['Vault AUM',fmtUsd(m.aumUsd)],['NAV / share',m.navPerShare.toFixed(4)],
+    ['Alice holds',fmtUsd(m.aliceUsd)],['Bob holds',fmtUsd(m.bobUsd)],
+    ['Yield realized',fmtUsd(m.accruedUsd)]
+  ].map(([l,v])=>`<div class="m"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+  let feed='';
+  if(s.role==='outsider'){
+    feed=`<div class="lc-hidden">🔒 ${s.hiddenCount||s.events.length+s.hiddenCount} on-chain event(s) exist — an outsider sees none of them.</div>`;
+    if(!s.hiddenCount&&!s.events.length) feed=`<div class="lc-empty">Press ▶ Next step — an outsider will still see nothing.</div>`;
+  }else{
+    feed=[...s.events].reverse().map(e=>`<div class="lc-ev"><div class="t">${e.title}</div>
+      <div class="d">${e.detail}</div><div class="daml">⛓ ${e.daml}</div></div>`).join('');
+    if(s.hiddenCount>0) feed+=`<div class="lc-hidden">🔒 ${s.hiddenCount} event(s) hidden from the ${s.role} — need-to-know</div>`;
+    if(!s.events.length&&!s.hiddenCount) feed=`<div class="lc-empty">Press ▶ Next step to run the first on-chain move.</div>`;
+  }
+  $('#lc-feed').innerHTML=feed;
+  $('#lc-next').disabled=!s.next;
+  $('#lc-next').textContent=s.next?('▶ '+(STEP_LABELS[s.next]||s.next).replace(/^\d · /,'')):'✓ Lifecycle complete';
+}
+async function lcFetch(url,opts){renderLC(await (await fetch(url,opts)).json());}
+$('#lc-next').onclick=()=>lcFetch('/api/lifecycle/next?role='+lcRole,{method:'POST'});
+$('#lc-reset').onclick=()=>lcFetch('/api/lifecycle/reset?role='+lcRole,{method:'POST'});
+document.querySelectorAll('#lc-roles button').forEach(b=>b.onclick=()=>{
+  lcRole=b.dataset.r;
+  document.querySelectorAll('#lc-roles button').forEach(x=>x.classList.toggle('on',x===b));
+  lcFetch('/api/lifecycle?role='+lcRole);
+});
+lcFetch('/api/lifecycle?role=observer');
 </script>
 </body></html>

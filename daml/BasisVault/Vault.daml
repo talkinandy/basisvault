@@ -139,6 +139,62 @@ template ShareHolding
         create RedeemRequest with
           operator; investor; auditor; holdingCid = self
 
+    -- Holder proposes transferring this holding to a new holder (secondary
+    -- transfer — the "transfer" step of the RWA workflow). Propose → accept →
+    -- operator settles. Need-to-know: only the two holders, the operator and
+    -- the auditor ever see the transfer; other investors and outsiders don't.
+    nonconsuming choice ShareHolding_ProposeTransfer : ContractId TransferProposal
+      with
+        newHolder : Party
+      controller investor
+      do
+        create TransferProposal with
+          operator; auditor; from = investor; to = newHolder; holdingCid = self
+
+-- A holder-signed offer to transfer a holding to `to`. The recipient accepts,
+-- then the operator (custodian, signatory of holdings) settles the re-issue.
+template TransferProposal
+  with
+    operator : Party
+    auditor : Party
+    from : Party
+    to : Party
+    holdingCid : ContractId ShareHolding
+  where
+    signatory from
+    observer operator, to, auditor
+
+    choice TransferProposal_Accept : ContractId AcceptedTransfer
+      controller to
+      do create AcceptedTransfer with operator; auditor; from; to; holdingCid
+
+    choice TransferProposal_Cancel : ()
+      controller from
+      do pure ()
+
+-- Both holders have agreed; the operator settles: archive the old holding,
+-- issue an identical one to the new holder. Share count (and thus NAV claim)
+-- is unchanged — a pure secondary transfer.
+template AcceptedTransfer
+  with
+    operator : Party
+    auditor : Party
+    from : Party
+    to : Party
+    holdingCid : ContractId ShareHolding
+  where
+    signatory from, to
+    observer operator, auditor
+
+    choice AcceptedTransfer_Settle : ContractId ShareHolding
+      controller operator
+      do
+        sh <- fetch holdingCid
+        assertMsg "holding must belong to the transferor" (sh.investor == from)
+        archive holdingCid
+        create ShareHolding with
+          operator; investor = to; auditor; shares = sh.shares
+
 -- Investor-signed deposit request; operator accepts to mint shares.
 template DepositRequest
   with

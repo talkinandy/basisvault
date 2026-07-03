@@ -166,6 +166,133 @@ def api_state(role: str = "auditor") -> JSONResponse:
     return JSONResponse(state_for(role))
 
 
+# --------------------------------------------------------------------------- #
+# Interactive lifecycle — the RWA track's end-to-end workflow, clickable:
+#   create (deposit+allocate) -> update status (accrue) -> transfer -> fulfill
+#   (close+redeem) -> audit (the observer feed sees everything, need-to-know
+#   filters the rest). Each step names the REAL Daml choices it exercises.
+# Backed by the mock ledger driver; swaps to JsonLedgerClient on the sandbox.
+# --------------------------------------------------------------------------- #
+LC_ROLES = ("issuer", "holder", "observer", "outsider")
+LC_STEPS = ["deposit", "allocate", "accrue", "transfer", "close", "redeem"]
+
+
+def _fresh_lc() -> dict:
+    return {"i": 0, "aum": 0.0, "shares": 0.0, "alice": 0.0, "bob": 0.0,
+            "allocs": [], "accrued": 0.0, "events": []}
+
+
+_LC = _fresh_lc()
+
+
+def _lc_pps() -> float:
+    return _LC["aum"] / _LC["shares"] if _LC["shares"] > 0 else 1.0
+
+
+def _lc_event(step: str, title: str, detail: str, daml: str, visible: list[str]) -> None:
+    _LC["events"].append({"step": step, "title": title, "detail": detail,
+                          "daml": daml, "visibleTo": visible})
+
+
+def _lc_run(step: str) -> None:
+    repo, mmf = _latest_rates()
+    if step == "deposit":
+        _LC["aum"] = 1_000_000.0
+        _LC["shares"] = 1_000_000.0
+        _LC["alice"] = 1_000_000.0
+        _lc_event(step, "Alice deposits $1.00M", "1,000,000 shares minted at NAV/share 1.0000",
+                  "DepositRequest_Accept → Vault_MintShares", ["issuer", "holder", "observer"])
+    elif step == "allocate":
+        quotes = [
+            YieldQuote(YieldSourceKind.REPO, "USTB-3M tokenized-Treasury repo", repo, 1.0),
+            YieldQuote(YieldSourceKind.MMF, "MMF-USD tokenized money-market fund", mmf, 1.0),
+        ]
+        targets = target_allocation(quotes, _LC["aum"])
+        _LC["allocs"] = [{"asset": t.asset, "rate": t.annualized_rate,
+                          "notional": t.target_notional} for t in targets]
+        for a in _LC["allocs"]:
+            _lc_event(step, f"Allocate ${a['notional']/1e6:.2f}M → {a['asset']}",
+                      f"approved at the oracle rate {a['rate']*100:.2f}%/yr",
+                      "Vault_ProposeAllocation → AllocationProposal_Approve",
+                      ["issuer", "observer"])
+    elif step == "accrue":
+        earned = sum(a["notional"] * a["rate"] * 0.25 for a in _LC["allocs"])
+        _LC["aum"] += earned
+        _LC["accrued"] += earned
+        _lc_event(step, f"One quarter of yield accrues: +${earned:,.0f}",
+                  f"realized only — principal × oracle rate × 0.25y; NAV/share → {_lc_pps():.4f}",
+                  "Vault_AccrueAllocation", ["issuer", "observer"])
+        _lc_event(step, "Your holding grew",
+                  f"your {_LC['alice']:,.0f} shares are now worth ${_LC['alice']*_lc_pps():,.0f}",
+                  "(your view of the same accrual)", ["holder"])
+    elif step == "transfer":
+        _LC["bob"] = _LC["alice"]
+        _LC["alice"] = 0.0
+        _lc_event(step, "Alice transfers her holding to Bob",
+                  "propose → Bob accepts → issuer settles; share count unchanged. "
+                  "Only Alice, Bob, issuer and the observer ever see this.",
+                  "ShareHolding_ProposeTransfer → TransferProposal_Accept → AcceptedTransfer_Settle",
+                  ["issuer", "holder", "observer"])
+    elif step == "close":
+        _lc_event(step, "Allocations closed — capital back to idle NAV",
+                  f"realized yield (${_LC['accrued']:,.0f}) already in NAV; nothing invented",
+                  "Vault_CloseAllocation", ["issuer", "observer"])
+        _LC["allocs"] = []
+    elif step == "redeem":
+        value = _LC["bob"] * _lc_pps()
+        _lc_event(step, f"Bob redeems at the higher NAV: ${value:,.0f}",
+                  f"entered via transfer at NAV/share {_lc_pps():.4f} — yield travelled with the shares",
+                  "RedeemRequest_Accept → Vault_BurnShares", ["issuer", "observer"])
+        _LC["aum"] -= value
+        _LC["shares"] = 0.0
+        _LC["bob"] = 0.0
+
+
+def _lc_view(role: str) -> dict:
+    # issuer signs everything and the observer audits everything — they see ALL
+    # events (the whole thesis); the holder sees only their own; outsider none.
+    if role in ("issuer", "observer"):
+        visible = list(_LC["events"])
+    elif role == "holder":
+        visible = [e for e in _LC["events"] if "holder" in e["visibleTo"]]
+    else:
+        visible = []
+    hidden = len(_LC["events"]) - len(visible)
+    pps = _lc_pps()
+    rnd = lambda x, n=2: round(x, n) or 0.0  # noqa: E731 — kill negative zero
+    return {
+        "steps": LC_STEPS, "next": LC_STEPS[_LC["i"]] if _LC["i"] < len(LC_STEPS) else None,
+        "done": _LC["i"],
+        "state": {"aumUsd": rnd(_LC["aum"]), "navPerShare": rnd(pps, 4),
+                  "aliceUsd": rnd(_LC["alice"] * pps), "bobUsd": rnd(_LC["bob"] * pps),
+                  "accruedUsd": rnd(_LC["accrued"])},
+        "events": visible, "hiddenCount": hidden,
+        "role": role,
+    }
+
+
+@app.get("/api/lifecycle")
+def api_lifecycle(role: str = "observer") -> JSONResponse:
+    if role not in LC_ROLES:
+        return JSONResponse({"error": f"role must be one of {LC_ROLES}"}, status_code=400)
+    return JSONResponse(_lc_view(role))
+
+
+@app.post("/api/lifecycle/next")
+def api_lifecycle_next(role: str = "observer") -> JSONResponse:
+    if _LC["i"] < len(LC_STEPS):
+        _lc_run(LC_STEPS[_LC["i"]])
+        _LC["i"] += 1
+    return JSONResponse(_lc_view(role))
+
+
+@app.post("/api/lifecycle/reset")
+def api_lifecycle_reset(role: str = "observer") -> JSONResponse:
+    global _LC
+    _LC = _fresh_lc()
+    return JSONResponse(_lc_view(role))
+
+
 @app.get("/", response_class=HTMLResponse)
 def index() -> str:
     return (_HERE / "index.html").read_text()
