@@ -40,8 +40,8 @@ class StrategyParams:
     # fraction of the current leg notional.
     rebalance_band: float = 0.10             # 10%
     # Default venues for the two legs (mapped to real adapters at integration).
-    short_venue: Venue = Venue.PERP_SWAP
-    long_venue: Venue = Venue.HELVET_SWAP
+    short_venue: Venue = Venue.HYPERLIQUID
+    long_venue: Venue = Venue.CANTEX
 
 
 def expected_carry(market: MarketSnapshot) -> float:

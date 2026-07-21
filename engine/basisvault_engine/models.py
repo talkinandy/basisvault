@@ -10,6 +10,7 @@ from enum import Enum
 
 class Underlying(str, Enum):
     CBTC = "CBTC"
+    CETH = "CETH"
     CC = "CC"
 
 
@@ -18,6 +19,8 @@ class Venue(str, Enum):
     # what HackCanton exposes — the design is venue-agnostic. Candidates seen in
     # the wild: Canborsa (perps), Helvet Swap (AMM CBTC/CC), Temple Lightspeed
     # (CLOB), Cantex (spot DEX). Map these to the real adapter at integration.
+    HYPERLIQUID = "Hyperliquid"   # perp short leg (off-Canton, agent-key executed)
+    CANTEX = "Cantex"             # live Canton DEX — spot long leg
     PERP_SWAP = "PerpSwap"
     HELVET_SWAP = "HelvetSwap"
     TEMPLE_LIGHTSPEED = "TempleLightspeed"

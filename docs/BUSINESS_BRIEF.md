@@ -1,50 +1,64 @@
 # BasisYield on Canton — business brief (1 page)
 
-**What it is.** A privacy-preserving, auditable **tokenized-RWA yield vault** on the
-Canton Network. Capital is allocated across tokenized-Treasury **repo** carry and
-**money-market** base yield, with an optional **RWA-collateralized delta-neutral
-carry** sleeve (the margin is a tokenized T-bill that earns base yield *while* it
-backs the trade). Every position is marked to an oracle rate; NAV only ever grows
-by **realized** yield. Live demo: https://canton.basisyield.com
+**What it is.** A privacy-preserving, auditable **market-neutral yield vault** on
+Canton, running the production [BasisYield](https://basisyield.com) cash-and-carry:
+**short the BTC/ETH perp on Hyperliquid** (collect the hourly funding leveraged
+longs pay) + **long cBTC/cETH custodied on Canton** (cancel the price risk). Net
+delta ≈ 0 is enforced on-chain; NAV only ever grows by **realized** funding.
+Live demo: https://canton.basisyield.com
+
+**Why this, why now.** Canton's live asset menu today is stablecoins (USDCx),
+cBTC (BitSafe) and cETH (OnRails) — and no mature Canton perp venue exists yet.
+Cash-and-carry is the institutional yield you can actually run on that menu
+*today*: spot leg in Canton custody, funding leg on the deepest perp venue there
+is. Backtested on **every hourly funding print Hyperliquid has paid over 3.2
+years**: **12.2% APY, 0.21% max drawdown**, rolling-1y range **4.7–22.6%**
+(today's compressed regime sits at the bottom of the range — stated, not hidden).
 
 ## ICP — who it's for
 
-1. **Primary: regulated institutions, funds, and corporate/DAO treasuries** holding
-   idle cash/stablecoins who need on-chain yield they can **audit and keep
-   confidential** — a real-time observer (auditor) view for compliance, zero
-   visibility for counterparties.
-2. Secondary: crypto-native treasuries seeking market-neutral, capital-preserving
-   yield without directional exposure.
+1. **Primary: crypto-native treasuries, funds and DAO treasuries** holding
+   BTC/ETH/stablecoins who want market-neutral on-chain yield **with a real
+   audit trail** — an observer (auditor) party that sees the whole book live.
+2. **Secondary: regulated institutions entering via Canton custody.** A
+   delta-neutral book that is *public* gets traded against; need-to-know
+   disclosure is what makes running this strategy on-chain viable at all.
 
 ## Use case
 
-Park treasury cash into the vault → the strategy allocates into tokenized-Treasury
-repo / MMF yield (backtested **8.7% APY blended, 4.5–14.5% rolling-1y range, 0.02%
-max drawdown** on 5y of real data) → yield accrues to NAV, realized-only → transfer
-holdings peer-to-peer or redeem at NAV. The fund's **auditor sees the entire book
-in real time**; other participants see only what they must (need-to-know).
+Deposit USDCx → the vault opens sign-guarded carry pairs (equal-notional short
+perp + long cBTC/cETH) → funding accrues to NAV, marked to an oracle feed,
+**realized only** → transfer holdings peer-to-peer or redeem at NAV. If trailing
+funding decays, the sign guard unwinds both legs — the short never pays through
+a negative regime. The **auditor sees every position, leg and holding in real
+time**; counterparties and other investors see nothing.
 
 ## Who pays
 
-- **Institutions** pay a management + performance fee on **realized** NAV growth
+- **Holders** pay a management + performance fee on **realized** NAV growth only
   (no fee on projections — aligned with the no-phantom-yield design).
-- **Canton network rewards**: every allocation/rebalance is genuine on-chain
-  volume, earning the app a share of the network reward pool (CIP-0104) — a second
-  revenue leg that subsidizes early TVL.
+- **Canton network rewards**: deposits, rebalances and accruals are genuine
+  on-chain volume earning the app a share of the reward pool (CIP-0104).
+- The yield source is structural, not emissions: perp longs paid **~14%/yr
+  average funding** (3.2-yr HL mean) to hold their positions. Somebody has to
+  be the landlord.
 
 ## Why Canton
 
-- **Privacy by construction** — sub-transaction need-to-know disclosure. The
-  auditor role sees everything; counterparties see nothing; there is no public
-  mempool leaking the book. Not achievable on a transparent EVM chain.
-- **Authorization-first Daml** — issuer (custodian) / holder / observer roles are
-  enforced by the ledger itself: the strategy engine can *propose* but can never
-  move funds. A fund structure compliance can sign off on.
-- **The RWA supply lives here** — ~$344B of represented RWA value is already on
-  Canton; DTCC launches tokenized US Treasuries on Canton in Oct 2026 (50+ firms
-  incl. BlackRock, JPMorgan); 24/7 atomic on-chain UST repo has already run live.
-  BasisYield's yield sources are Canton's flagship assets, behind drop-in seams.
+- **Privacy by construction** — sub-transaction need-to-know disclosure: auditor
+  sees everything, counterparties nothing, no public mempool leaking the book.
+- **Authorization-first Daml** — issuer/holder/observer roles enforced by the
+  ledger: the strategy engine *proposes*, it can never move funds.
+- **Institutional custody for the spot leg** — cBTC/cETH are CIP-56 tokens
+  (BitSafe: threshold-signature custody, Quantstamp-audited, Chainlink feeds)
+  instead of an exchange balance.
+- **The stacking roadmap** — as tokenized RWAs ship (DBS gold token H2 2026,
+  DTCC tokenized Treasuries Oct 2026), the *margin itself* earns ~5%/yr base
+  yield while backing the carry (backtested: carry sleeve 11.6%/yr over 5y) —
+  an edge no crypto venue offers, since idle USDC margin earns 0 there.
 
 ---
-*HackCanton League S2 · RWA & Business Workflows track · repo: github.com/talkinandy/basisvault ·
+*HackCanton League S2 · RWA & Business Workflows track · repo:
+github.com/talkinandy/basisvault · the mechanism is the live BasisYield engine
+(24/7 paper-trading on real Hyperliquid prints), not a hackathon sketch ·
 demo project — not an offer of any financial product.*

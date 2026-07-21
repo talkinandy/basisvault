@@ -1,118 +1,123 @@
 # BasisVault
 
-**A privacy-preserving, auditable tokenized-RWA yield vault on the [Canton Network](https://canton.network).**
+**BasisYield on Canton — a privacy-preserving, auditable market-neutral yield
+vault on the [Canton Network](https://canton.network).**
+Live: **https://canton.basisyield.com**
 
-BasisVault gives institutions **on-chain yield they can audit** — and keep
-confidential. It allocates vault capital across Canton's tokenized real-world-asset
-yield sources — **tokenized-Treasury repo carry** and **money-market-fund base
-yield** (with tokenized credit as a stretch) — via a rules-based, regime-aware
-allocator, and marks every position to an **oracle rate** so the yield is real, not
-projected. A delta-neutral **basis** strategy (short perp + long spot) is included
-as one secondary source. Canton's **need-to-know disclosure** does the rest: the
-auditor sees the whole book, each investor sees only their own holding, and
-counterparties see nothing.
+BasisVault runs the production [BasisYield](https://basisyield.com) cash-and-carry
+on Canton's live asset menu: **short the BTC/ETH perp on Hyperliquid** (collect
+the hourly funding leveraged longs pay) + **long cBTC/cETH custodied on Canton**
+(cancel the price risk). Net delta ≈ 0 is enforced on-chain; NAV only ever grows
+by **realized** funding, marked to oracle feeds. Canton's **need-to-know
+disclosure** does the rest: the auditor sees the whole book, each investor sees
+only their own holding, and counterparties see nothing — which is what makes
+running a delta-neutral book on-chain viable at all (a public book gets traded
+against).
 
 Built for **HackCanton League — Season 2** (hosted by NODERS). Track: **Real-World
 Asset (RWA) & Business Workflows**. **Submission deadline: 2026-07-25 23:59 UTC** ·
 Grand Final 2026-08-05. See [`docs/SUBMISSION.md`](docs/SUBMISSION.md) for the
-track-requirement map, economic flows, GTM, and demo script.
+track-requirement map and demo script.
 
 ---
 
-## Why it fits Canton (and the winning pattern)
+## Why this shape (mentor-validated)
 
-Canton's flagship use case is **institutional, regulated, tokenized RWA** —
-Treasuries, repo, MMFs, credit. "Auditable, privacy-preserving yield on tokenized
-Treasuries you can show your auditor and hide from counterparties" is exactly the
-institutional-first, privacy-first axis that won Season 1 (Confimarket).
+Canton's asset menu **today** is stablecoins (USDCx via Circle xReserve), cBTC
+(BitSafe, CIP-56) and cETH (OnRails, CIP-56) — with no mature Canton perp venue
+yet. So the yield you can actually run *now* is cash-and-carry: spot leg in
+Canton custody, funding leg on the deepest perp venue there is. Tokenized RWAs
+are the **next phase** behind the same seams: the DBS gold token (H2 2026)
+becomes the third carry pair, and tokenized T-bills (DTCC, Oct 2026) become
+margin that **earns base yield while backing the carry** — the stacking edge no
+crypto venue offers.
 
 | Judges care about | BasisVault shows |
 |---|---|
-| **RWA / institutional** | tokenized-Treasury repo + MMF yield as the hero; fund roles enforced by Daml |
-| **Privacy-first** (the S1 axis) | per-party need-to-know: auditor sees all, holder sees own, outsider sees nothing |
-| **Oracles** (Chainlink judge) | every allocation marked to an oracle `RateFeed`; basis source marked to price |
-| **Security / honesty** (Quantstamp) | deterministic Daml, explicit guards, **realized yield only — no phantom NAV** |
-| **Real volume** (network reward pool) | allocations + rebalances are on-chain activity; live counter on the dashboard |
+| **Real, runnable today** | the mechanism is a live production system; the demo executes real Daml txs on a Canton ledger |
+| **Privacy-first** (the S1 axis) | per-party need-to-know: auditor sees all, holder sees own, outsider sees nothing — ledger-enforced ACS counts in the UI |
+| **Oracles** (Chainlink judge) | positions open at an oracle `PriceFeed` mark; funding accrues at an oracle `RateFeed` |
+| **Security / honesty** (Quantstamp) | deterministic Daml, net-delta guard on-chain, **realized yield only — no phantom NAV**, regime range stated with today at the bottom |
+| **RWA trajectory** | gold/T-bill margin stacking modeled + backtested behind the same seams |
 
-## The RWA workflow (what the track asks for)
+## The end-to-end workflow (what the track asks for)
 
-The RWA track wants one end-to-end workflow — *create → update status → fulfill →
-audit/report* — with roles. BasisVault's allocation lifecycle **is** that workflow:
+*create → update status → transfer → fulfill → audit/report*, with roles:
 
 | Step | On-chain (Daml) | Role |
 |---|---|---|
-| **create** | `Vault_ProposeAllocation` → `AllocationProposal_Approve` (at the oracle rate feed) | manager proposes, operator approves |
-| **update status** | `Vault_AccrueAllocation` — marks *realized* yield to NAV (repeatable) | operator |
-| **fulfill** | `Vault_CloseAllocation` — capital returns to idle NAV | operator |
-| **audit/report** | auditor observes vault + every allocation + accrued yield throughout | auditor |
+| **create** | `Vault_ProposeRebalance` → `RebalanceProposal_Approve` — open short-HL + long-Canton legs at the oracle mark, net-delta ≈ 0 asserted | manager proposes, operator approves |
+| **update status** | `Vault_AccrueFunding` — realized funding → NAV at the oracle `RateFeed` (repeatable) | operator |
+| **transfer** | `ShareHolding_ProposeTransfer` → `TransferProposal_Accept` → `AcceptedTransfer_Settle` | holder → holder, operator settles |
+| **fulfill** | `Vault_UnwindPosition` (sign guard closes both legs) + `RedeemRequest_Accept` | operator |
+| **audit/report** | auditor observes vault, positions, legs, feeds and holdings throughout | auditor |
 
 ## Roles & privacy (the wedge)
 
 | Party | Role | Sees | Authorizes |
 |---|---|---|---|
-| **operator** | custodian / issuer | everything it signs | approve allocations, accrue, close, mint/burn |
-| **manager** | off-chain allocator | vault state | *proposes* allocations (cannot mint) |
+| **operator** | custodian / issuer | everything it signs | approve pairs, accrue, unwind, mint/burn |
+| **manager** | off-chain strategy engine | vault state | *proposes* pairs (cannot move funds) |
 | **auditor** | regulator / observer | **everything** | nothing |
-| **investor** | holder | **only their own** holding + NAV + headline yield | deposit / request redeem |
+| **investor** | holder | **only their own** holding + NAV + headline yield | deposit / transfer / request redeem |
 | **outsider** | — | **nothing** | — |
 
-`Test.VaultTest:testPrivacy` proves the outsider sees zero contracts; `testAllocation`
-proves the investor cannot see the strategy book — Canton need-to-know in action.
+`Test.VaultTest:testPrivacy` proves the outsider sees zero contracts;
+`testRebalance`/`testCarryTwoAssets` prove the investor cannot see the book —
+Canton need-to-know in action, and on the live demo the per-role contract counts
+come from the **ledger's own ACS**, not the UI.
 
 ---
 
-## Proof: honest backtest on 5 years of real data
+## Proof: honest backtest on the real venue's data
 
-The headline is **RWA-collateralized carry** — the BasisYield (Hyperliquid)
-mechanism, made better by Canton: a delta-neutral carry whose **margin is a
-tokenized T-bill**, so the collateral earns base yield *while* it backs the trade
-(idle margin earns 0 on a crypto venue). Replayed over **5y of real BTC funding
-(Binance) + SOFR/3M-T-bill (FRED)**:
+The production entry/exit rules replayed over **every hourly funding print
+Hyperliquid has paid for BTC and ETH (3.2 years, 27,427 prints each)** —
+non-lookahead, both-legs costs on every open/unwind, sign-guarded, 5× perp
+leverage set by the liquidation buffer (83% capital efficiency), **realized
+funding only**:
 
-| Strategy | APY (5y) | Max DD | Notes |
+| Strategy | APY | Max DD | Notes |
 |---|---|---|---|
-| **Stacked RWA-collateralized carry (headline)** | **8.7%** · rolling-1y range **4.5–14.5%** | **0.02%** | T-bill collateral **5.2%** + funding **10.0%** = carry sleeve **11.6%**; blended 60/40 with pure RWA |
-| Pure RWA repo + MMF | 3.4% | 0.00% | capital-preserving floor |
-| Delta-neutral basis only | 6.1% | 0.18% | funding carry, sign-guarded |
+| **HL carry, cBTC+cETH blended (hero)** | **12.2%** · rolling-1y range **4.7–22.6%** | **0.21%** | cBTC sleeve 12.3% · cETH sleeve 12.1%; deployed ~82% of hours; today's regime ≈ 4.7% (bottom of range — stated) |
+| Next phase: RWA-margin stacking (projection) | 8.7% · range 4.5–14.5% | 0.02% | T-bill margin 5.2% + funding 10.0% = carry sleeve 11.6% (5y BTC funding + FRED rates) |
 
-The collateral-yield **stacking** is the structural edge Hyperliquid can't offer.
-Non-lookahead, real turnover costs, sign-guarded funding, idle cash earns 0,
-**realized yield only**, 1× notional (no leverage). Funding is regime-dependent —
-the range is data-driven, not cherry-picked. Reproduce: `python -m basisvault_engine.backtest`.
+Reproduce: `python scripts/fetch_hl_funding.py && python -m basisvault_engine.backtest`.
 
 ## Status — all green
 
 ```
-daml test     -> setupParties · testDepositRedeem · testPrivacy · testRebalance · testAllocation   (5 ✓)
-pytest        -> 28 passed  (strategy · allocator · backtest · ledger · dashboard)
+daml test  -> setupParties · testDepositRedeem · testPrivacy · testRebalance ·
+              testCarryTwoAssets · testAllocation · testTransfer            (7 ✓)
+pytest     -> 38 passed  (strategy · allocator · backtest incl. HL carry)
+live demo  -> 6-step lifecycle as REAL Daml txs on a Canton sandbox
+              (JSON Ledger API v2), per-role ACS counts ledger-enforced
 ```
 
 Canton is Daml 3.x (mainnet Canton 3.5.x / Splice 0.6.x); pinned to SDK **3.4.11**
-(latest stable open-source; `.dar`s compatible per the Canton docs). RWA assets and
-venue legs that aren't live on Canton yet sit behind **mock seams** — real
-tokenized-RWA tokens, venue adapters, and the live JSON-Ledger-API client drop in
-unchanged as the infrastructure ships / onboarding lands. See
-[`docs/DEV_NOTES.md`](docs/DEV_NOTES.md).
+(latest stable open-source). Hyperliquid order execution stays **mocked as a
+`VenueLeg` attestation** in the demo (the production execution stack exists but
+is not armed here); the CIP-56 holdings for cBTC/cETH are pilot step 1 — see
+[`docs/PILOT_PLAN.md`](docs/PILOT_PLAN.md).
 
 ## Layout
 
 ```
-daml/BasisVault/Types.daml        Underlying/Venue/Side + YieldSourceKind + Allocation/RebalancePlan
-daml/BasisVault/YieldSource.daml  RateFeed (oracle yield) + Allocation (RWA source) — the hero
-daml/BasisVault/Vault.daml        Vault + roles; allocation workflow + deposit/redeem + basis rebalance
-daml/BasisVault/Venue.daml        PriceFeed + VenueLeg (mock perp/spot adapter seam — basis source)
-daml/BasisVault/Position.daml     DeltaNeutralPosition (basis source), net-delta-≈0 guard, Unwind
-daml/Test/VaultTest.daml          deposit/redeem · privacy · rebalance · RWA allocation lifecycle
+daml/BasisVault/Types.daml        Underlying (CBTC/CETH/…) · Venue (Hyperliquid/Cantex/…) · plans
+daml/BasisVault/Vault.daml        Vault + roles; carry workflow (propose/approve/accrue/unwind),
+                                  deposit/redeem, transfers; next-phase RWA allocation workflow
+daml/BasisVault/Position.daml     DeltaNeutralPosition (+ realized fundingAccrued), net-delta guard
+daml/BasisVault/Venue.daml        PriceFeed (oracle mark) + VenueLeg (venue adapter seam)
+daml/BasisVault/YieldSource.daml  RateFeed (oracle funding/yield) + Allocation (next-phase RWA)
+daml/Test/VaultTest.daml          7 scripts: lifecycle, privacy, two-asset book, transfer
 engine/basisvault_engine/
-  allocator.py                    rules-based RWA allocation (the hero strategy)
-  strategy.py                     delta-neutral carry logic (secondary basis source)
-  backtest.py                     RWA + basis backtests (real rate/funding data)
+  backtest.py                     HL carry hero + RWA + stacked backtests (real data)
+  strategy.py · allocator.py      carry thresholds/sign guard · next-phase RWA allocator
   ledger.py                       LedgerClient: Mock (zero creds) + JSON Ledger API
-  models.py · engine.py · config.py
-engine/scripts/                   fetch_rates.py (FRED SOFR/T-bill), fetch_funding.py (Binance)
-engine/data/                      committed real rate/funding data + backtest results
-web/app.py                        dashboard: RWA portfolio + backtest band + role views
-docs/                             SUBMISSION.md (submission pack) · SCOPING · BUILD_PLAN · DEV_NOTES
+engine/scripts/                   fetch_hl_funding.py (Hyperliquid) · fetch_rates.py (FRED) · fetch_funding.py
+engine/data/                      committed real funding/rate data + backtest results
+web/app.py · web/ledger_bridge.py dashboard + REAL-ledger lifecycle driver (JSON Ledger API v2)
+docs/                             SUBMISSION.md · BUSINESS_BRIEF.md · PILOT_PLAN.md · DEPLOY.md · DEV_NOTES.md
 ```
 
 ## Build & test
@@ -129,7 +134,9 @@ daml build && daml test
 cd engine && python -m venv .venv && . .venv/bin/activate
 pip install -e '.[dev,ledger,dashboard]'
 pytest -q
-python scripts/fetch_rates.py 3 && python -m basisvault_engine.backtest   # real-data backtest
+python scripts/fetch_hl_funding.py && python -m basisvault_engine.backtest  # real-data backtests
+cd .. && daml sandbox --port 6865 --json-api-port 7575 \
+  --dar .daml/dist/basisvault-0.1.0.dar --wall-clock-time &   # real ledger for the demo
 uvicorn web.app:app --reload   # dashboard at localhost:8000 (run from repo root)
 ```
 
@@ -138,18 +145,13 @@ uvicorn web.app:app --reload   # dashboard at localhost:8000 (run from repo root
 
 ## Roadmap
 
-- **On-chain ✅** — vault + roles + privacy; RWA allocation workflow (create/accrue/close);
-  basis source (delta-neutral rebalance/unwind). 5 Daml scripts green.
-- **Off-chain ✅** — RWA allocator + delta-neutral strategy + real-data backtests + mock/JSON
-  ledger clients; 28 tests green.
-- **Dashboard ✅** — RWA portfolio + auditable backtest band + network-activity, role-filtered.
-- **Submission packaging** — `docs/SUBMISSION.md`: track map, economic flows, GTM/ICP, demo script.
-- **Pending onboarding (Delivery phase, Jul 4+)** — real tokenized-RWA assets + rate feeds, testnet
-  + JSON Ledger API creds, deploy; swap mock seams for live.
-
-> **Canton RWA / venue reality (researched 2026-06-19):** Canton's tokenized-RWA
-> rails are still rolling out; live trading venues include **Canborsa** (perps),
-> **Helvet Swap** (CBTC/CC AMM), **Cantex** (spot DEX), **Temple Lightspeed** (CLOB),
-> with **Chainlink** oracles live. None publish open Daml interfaces or testnet creds
-> yet — hence the mock seams. Building for the infrastructure Canton is shipping, not
-> only what exists today.
+- **This phase ✅** — carry vault on Canton's live assets: on-chain workflow
+  (7 Daml scripts), HL-carry backtest on 3.2y of real funding, real-ledger demo,
+  submission pack.
+- **Pilot step 1** — real testnet cBTC/cETH via CIP-56 (`Holding` /
+  `TransferInstruction`) + BitSafe `cbtc-lib`; testnet participant.
+- **Pilot step 2** — arm the HL short with the production execution stack
+  (agent key, leg-sync, killswitch); collateral balancer between HL margin and
+  Canton custody.
+- **Next phase** — DBS gold token pair (H2 2026); DTCC tokenized-T-bill margin
+  (Oct 2026) → the stacking edge; Canton-native perp venue when one matures.

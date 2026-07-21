@@ -96,30 +96,32 @@ testPrivacy = do
   mHoldings <- query @ShareHolding p.mallory
   assertMsg "outsider must NOT see any holding" (null mHoldings)
 
--- Day-2: the carry, on-chain. Manager proposes a delta-neutral pair; operator
--- approves at the oracle mark; both legs open equal-notional (net delta ≈ 0); a
--- DeltaNeutralPosition records it; unwind closes both legs. Privacy holds
--- throughout (auditor sees the book, outsider sees nothing).
+-- THE HERO: the cash-and-carry lifecycle, on-chain. Manager proposes a
+-- delta-neutral pair (short Hyperliquid perp + long cBTC spot on Canton);
+-- operator approves at the oracle mark; REAL funding accrues to NAV at the
+-- oracle funding feed (realized only); the sign guard unwinds both legs.
+-- Privacy holds throughout (auditor sees the book, outsider sees nothing).
 testRebalance : Script ()
 testRebalance = do
   p <- setupParties
-  vault <- submit p.operator do
+  vault0 <- submit p.operator do
     createCmd Vault with
       operator = p.operator; manager = p.manager; auditor = p.auditor
-      underlying = CBTC; totalAssets = 0.0; totalShares = 0.0
+      underlying = CBTC; totalAssets = 1000000.0; totalShares = 1000000.0
 
-  -- oracle publishes a CBTC mark; operator can see it (observer).
+  -- oracle publishes a cBTC mark (Chainlink ships cBTC feeds on Canton).
   feed <- submit p.oracle do
     createCmd PriceFeed with
       oracle = p.oracle; operator = p.operator; underlying = CBTC; price = 65000.0
 
-  -- manager proposes a delta-neutral pair: short PerpSwap + long Helvet, equal notional.
+  -- manager proposes: short BTC perp on Hyperliquid + long cBTC via Cantex,
+  -- equal notional, margined by USDCx (0% — the stacked-RWA margin is next phase).
   let plan = RebalancePlan with
-        underlying = CBTC; shortVenue = PerpSwap; longVenue = HelvetSwap
-        notional = 1000.0
-        collateralAsset = "USTB-3M"; collateralRate = 0.0464   -- RWA-collateralized
+        underlying = CBTC; shortVenue = Hyperliquid; longVenue = Cantex
+        notional = 800000.0
+        collateralAsset = "USDCx"; collateralRate = 0.0
   proposal <- submit p.manager do
-    exerciseCmd vault Vault_ProposeRebalance with plan
+    exerciseCmd vault0 Vault_ProposeRebalance with plan
 
   -- operator approves at the oracle mark.
   posCid <- submit p.operator do
@@ -131,11 +133,30 @@ testRebalance = do
     Some pos -> do
       netDelta pos.longNotional pos.shortNotional === 0.0
       pos.markPrice === 65000.0
-      pos.collateralAsset === "USTB-3M"   -- carry is RWA-collateralized
-      pos.collateralRate === 0.0464
+      pos.collateralAsset === "USDCx"
+      pos.fundingAccrued === 0.0
     None -> abort "delta-neutral position not found after approval"
 
-  -- both legs opened, visible to the auditor; outsider sees nothing.
+  -- update status: oracle publishes the trailing HL funding rate (14%/yr —
+  -- the 3.2y HL average is ~14%); accrue a quarter of a year of REAL funding.
+  -- NAV grows by 800k × 14% × 0.25 = 28k. Realized only, no phantom yield.
+  fundingFeed <- submit p.oracle do
+    createCmd RateFeed with
+      oracle = p.oracle; operator = p.operator
+      kind = Basis; asset = "BTC-PERP-HL"; annualizedRate = 0.14
+  (vault1, pos1) <- submit p.operator do
+    exerciseCmd vault0 Vault_AccrueFunding with
+      positionCid = posCid; rateFeedCid = fundingFeed; yearFraction = 0.25
+  optV <- queryContractId p.operator vault1
+  case optV of
+    Some v -> v.totalAssets === 1028000.0
+    None -> abort "vault missing after funding accrual"
+  optP1 <- queryContractId p.operator pos1
+  case optP1 of
+    Some pp -> pp.fundingAccrued === 28000.0
+    None -> abort "position missing after funding accrual"
+
+  -- both legs open, visible to the auditor; outsider sees nothing.
   auditorLegs <- query @VenueLeg p.auditor
   assertMsg "auditor sees both legs" (length auditorLegs == 2)
   auditorPos <- query @DeltaNeutralPosition p.auditor
@@ -145,12 +166,48 @@ testRebalance = do
   mPos <- query @DeltaNeutralPosition p.mallory
   assertMsg "outsider must NOT see the position" (null mPos)
 
-  -- unwind: operator closes both legs and the position.
-  submit p.operator do exerciseCmd posCid DeltaNeutralPosition_Unwind
+  -- fulfill: the sign guard unwinds — both legs close via the vault choice.
+  submit p.operator do
+    exerciseCmd vault1 Vault_UnwindPosition with positionCid = pos1
   legsAfter <- query @VenueLeg p.operator
   assertMsg "legs closed after unwind" (null legsAfter)
   posAfter <- query @DeltaNeutralPosition p.operator
   assertMsg "position closed after unwind" (null posAfter)
+
+-- A second carry pair on cETH proves the two-asset book (BTC + ETH), each
+-- pair independently sign-guarded — mirroring the production BasisYield
+-- cash-carry sleeve.
+testCarryTwoAssets : Script ()
+testCarryTwoAssets = do
+  p <- setupParties
+  vault <- submit p.operator do
+    createCmd Vault with
+      operator = p.operator; manager = p.manager; auditor = p.auditor
+      underlying = CBTC; totalAssets = 1000000.0; totalShares = 1000000.0
+  btcMark <- submit p.oracle do
+    createCmd PriceFeed with
+      oracle = p.oracle; operator = p.operator; underlying = CBTC; price = 65000.0
+  ethMark <- submit p.oracle do
+    createCmd PriceFeed with
+      oracle = p.oracle; operator = p.operator; underlying = CETH; price = 3200.0
+
+  let mkPlan u = RebalancePlan with
+        underlying = u; shortVenue = Hyperliquid; longVenue = Cantex
+        notional = 400000.0; collateralAsset = "USDCx"; collateralRate = 0.0
+  btcProp <- submit p.manager do
+    exerciseCmd vault Vault_ProposeRebalance with plan = mkPlan CBTC
+  ethProp <- submit p.manager do
+    exerciseCmd vault Vault_ProposeRebalance with plan = mkPlan CETH
+  _ <- submit p.operator do
+    exerciseCmd btcProp RebalanceProposal_Approve with priceFeedCid = btcMark
+  _ <- submit p.operator do
+    exerciseCmd ethProp RebalanceProposal_Approve with priceFeedCid = ethMark
+
+  -- the auditor sees the whole two-asset book; an investor none of it.
+  auditorPos <- query @DeltaNeutralPosition p.auditor
+  assertMsg "auditor sees both carry pairs" (length auditorPos == 2)
+  alicePos <- query @DeltaNeutralPosition p.alice
+  assertMsg "investor must NOT see the book" (null alicePos)
 
 -- The RWA hero workflow: create -> update status (accrue) -> fulfill (close) ->
 -- audit. Manager proposes a tokenized-Treasury repo allocation; operator

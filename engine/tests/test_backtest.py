@@ -8,7 +8,10 @@ import pytest
 from basisvault_engine.backtest import (
     FundingPoint,
     RatePoint,
+    capital_efficiency,
+    optimal_leverage,
     run_backtest,
+    run_hl_carry_backtest,
     run_rwa_backtest,
     run_stacked_backtest,
 )
@@ -131,3 +134,79 @@ def test_stacked_needs_overlap():
     with pytest.raises(ValueError):
         run_stacked_backtest([FundingPoint(0, 0.0001, 65_000.0)],
                              [RatePoint(0, 0.05, 0.045)])
+
+
+# --- HL carry backtest (the hero: short HL perp + long cBTC/cETH on Canton) ---
+_1H = 3600 * 1000
+
+
+def hourly(rate: float, hours: int, start: int = 0) -> list[FundingPoint]:
+    return [FundingPoint(start + i * _1H, rate, 0.0) for i in range(hours)]
+
+
+def test_optimal_leverage_matches_liquidation_buffer():
+    # L <= 1/(maint + move): 1/(0.02+0.15) = 5.88 -> 5
+    assert optimal_leverage(0.02, 0.15, 10) == 5
+    assert optimal_leverage(0.02, 0.15, 3) == 3       # exchange cap wins
+    assert capital_efficiency(5) == pytest.approx(5 / 6)
+
+
+def test_carry_positive_funding_deploys_and_earns_at_capital_efficiency():
+    hours = 24 * 365
+    rate = 0.10 / (24 * 365)                          # 10%/yr paid hourly
+    res = run_hl_carry_backtest({"CBTC": hourly(rate, hours)}, cost_bps=0.0)
+    s = res.sleeves[0]
+    assert s.opens == 1 and s.unwinds == 0            # steady regime, no churn
+    # earns funding on eff (~83%) of capital, compounding hourly
+    assert res.apy == pytest.approx(0.10 * res.capital_efficiency, abs=0.01)
+    assert res.max_drawdown == 0.0
+
+
+def test_carry_negative_funding_never_deploys():
+    hours = 24 * 90
+    rate = -0.10 / (24 * 365)
+    res = run_hl_carry_backtest({"CBTC": hourly(rate, hours)})
+    s = res.sleeves[0]
+    assert s.opens == 0 and s.pct_time_deployed == 0.0
+    assert res.nav_final == res.nav_start             # sign guard: never pays
+
+
+def test_carry_sign_guard_unwinds_on_regime_flip():
+    hours = 24 * 60
+    pos = 0.20 / (24 * 365)                           # rich funding, then flips
+    neg = -0.05 / (24 * 365)
+    data = hourly(pos, hours) + hourly(neg, hours, start=hours * _1H)
+    res = run_hl_carry_backtest({"CBTC": data}, cost_bps=0.0)
+    s = res.sleeves[0]
+    assert s.opens == 1 and s.unwinds == 1            # exited when trailing decayed
+    # kept most of the positive-regime gains (paid only the trailing-window lag)
+    assert res.nav_final > res.nav_start * 1.02
+
+
+def test_carry_costs_are_charged_on_both_legs():
+    hours = 24 * 365
+    rate = 0.10 / (24 * 365)
+    free = run_hl_carry_backtest({"CBTC": hourly(rate, hours)}, cost_bps=0.0)
+    paid = run_hl_carry_backtest({"CBTC": hourly(rate, hours)}, cost_bps=10.0)
+    assert paid.nav_final < free.nav_final
+    assert paid.sleeves[0].total_costs > 0.0
+
+
+def test_carry_blends_two_assets_and_reports_range():
+    hours = 24 * 400
+    btc = hourly(0.15 / (24 * 365), hours)
+    eth = hourly(0.05 / (24 * 365), hours)
+    res = run_hl_carry_backtest({"CBTC": btc, "CETH": eth}, cost_bps=0.0)
+    assert len(res.sleeves) == 2
+    apys = {s.asset: s.apy for s in res.sleeves}
+    assert apys["CBTC"] > apys["CETH"]                # sleeves independent
+    assert apys["CETH"] < res.apy < apys["CBTC"]      # blend in between
+    assert res.annual_range[0] <= res.annual_range[1] <= res.annual_range[2]
+    assert res.today_apy >= 0.0
+
+
+def test_carry_needs_data():
+    with pytest.raises(ValueError):
+        run_hl_carry_backtest({})
+    with pytest.raises(ValueError):
+        run_hl_carry_backtest({"CBTC": hourly(0.0001, 1)})

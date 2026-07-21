@@ -300,6 +300,196 @@ def run_rwa_backtest(
 
 
 # --------------------------------------------------------------------------- #
+# HL CARRY backtest (THE HERO this phase) — the production BasisYield cash-and-
+# carry ported to Canton's live asset menu: SHORT the BTC/ETH perp on
+# Hyperliquid (receive funding), LONG cBTC/cETH spot custodied on Canton
+# (cancel price). Mechanism mirrors the live fundingcarry engine:
+#   - trailing funding APR over a rolling window (never a single print),
+#   - ENTER when trailing APR >= entry_apr, UNWIND BOTH legs below exit_apr
+#     (the funding-sign guard: a short must never pay through a negative regime),
+#   - perp leverage L chosen so the liquidation distance survives a configured
+#     adverse up-move:  L <= 1/(maint + move); capture on deployed capital is
+#     funding × L/(L+1) (spot 1x + margin 1/L) — the capital-efficiency term.
+# Honest by construction: REAL Hyperliquid funding prints (variable intervals,
+# annualized by actual elapsed time), realized funding only, both-legs trading
+# costs on every open/unwind, non-lookahead (decide on the trailing window,
+# accrue the NEXT print).
+# --------------------------------------------------------------------------- #
+HOURS_PER_YEAR = 24.0 * 365.0
+
+
+def optimal_leverage(maint_margin: float, max_adverse_move: float,
+                     max_leverage: int) -> int:
+    """Highest perp leverage whose liquidation distance (~1/L - maint) still
+    survives an adverse up-move before a rebalance: L <= 1/(maint + move)."""
+    if maint_margin + max_adverse_move <= 0:
+        return max_leverage
+    return max(1, min(max_leverage, int(1.0 / (maint_margin + max_adverse_move))))
+
+
+def capital_efficiency(leverage: int) -> float:
+    """Fraction of deployed capital earning funding: spot uses 1x notional,
+    perp margin notional/L, so earning_notional/capital = L/(L+1)."""
+    return leverage / (leverage + 1.0)
+
+
+@dataclass(frozen=True)
+class CarrySleeveStats:
+    asset: str                 # "CBTC" / "CETH"
+    apy: float
+    gross_funding: float
+    total_costs: float
+    opens: int
+    unwinds: int
+    pct_time_deployed: float
+    avg_funding_annual: float  # mean annualized funding over the whole window
+
+
+@dataclass(frozen=True)
+class HlCarryBacktestResult:
+    start: int
+    end: int
+    years: float
+    nav_start: float
+    nav_final: float
+    apy: float                    # blended two-asset portfolio
+    max_drawdown: float
+    leverage: int
+    capital_efficiency: float
+    sleeves: list[CarrySleeveStats]
+    annual_range: list[float]     # [min, median, max] rolling-1y blended return
+    today_apy: float              # trailing-1y blended (current regime)
+    nav_curve: list[list[float]]
+
+
+def _trailing_apr(window: list[FundingPoint]) -> float | None:
+    """Annualized funding over a trailing slice: sum of prints / elapsed time.
+    None with fewer than 3 prints (mirrors the live engine's data floor)."""
+    if len(window) < 3:
+        return None
+    span_years = (window[-1].time - window[0].time) / _MS_PER_YEAR
+    if span_years <= 0:
+        return None
+    return sum(p.funding_rate for p in window) / span_years
+
+
+def run_hl_carry_backtest(
+    funding_by_asset: dict[str, list[FundingPoint]],
+    nav_start: float = 1_000_000.0,
+    entry_apr: float = 0.05,          # production cash_carry.entry_apr
+    exit_apr: float = 0.02,           # production cash_carry.exit_apr
+    window_h: int = 72,               # trailing funding window (3d: cuts churn)
+    maint_margin: float = 0.02,
+    max_adverse_move: float = 0.15,
+    max_leverage: int = 10,
+    cost_bps: float = 2.0,            # per unit notional routed, both legs
+    curve_points: int = 260,
+) -> HlCarryBacktestResult:
+    assets = sorted(funding_by_asset)
+    if not assets:
+        raise ValueError("need at least one funding series")
+    lev = optimal_leverage(maint_margin, max_adverse_move, max_leverage)
+    eff = capital_efficiency(lev)
+    cost = cost_bps / 10_000.0
+
+    sleeves: list[CarrySleeveStats] = []
+    curves: dict[str, tuple[list[int], list[float]]] = {}
+
+    for asset in assets:
+        data = funding_by_asset[asset]
+        if len(data) < 2:
+            raise ValueError(f"{asset}: need at least 2 funding points")
+        nav = nav_start / len(assets)
+        nav0 = nav
+        deployed = False
+        opens = unwinds = on = 0
+        gross = costs = 0.0
+        navs: list[float] = []
+        times: list[int] = []
+        window: list[FundingPoint] = []
+        win_ms = window_h * 3600 * 1000
+
+        for pt in data:
+            # 1) accrue THIS print's actual funding on the carried position
+            #    (decided on data strictly before it — non-lookahead)
+            if deployed:
+                gain = nav * eff * pt.funding_rate
+                nav += gain
+                gross += gain
+                on += 1
+            navs.append(nav)
+            times.append(pt.time)
+
+            # 2) update the trailing window, then decide for the next print
+            window.append(pt)
+            while window and window[0].time < pt.time - win_ms:
+                window.pop(0)
+            apr = _trailing_apr(window)
+            if apr is None:
+                continue
+            if not deployed and apr >= entry_apr:
+                fee = nav * eff * 2.0 * cost      # open both legs
+                nav -= fee; costs += fee
+                deployed = True; opens += 1
+            elif deployed and apr < exit_apr:
+                fee = nav * eff * 2.0 * cost      # unwind both legs
+                nav -= fee; costs += fee
+                deployed = False; unwinds += 1
+
+        years = (data[-1].time - data[0].time) / _MS_PER_YEAR
+        total_ann = sum(p.funding_rate for p in data) / years if years > 0 else 0.0
+        sleeves.append(CarrySleeveStats(
+            asset=asset, apy=round((nav / nav0) ** (1.0 / years) - 1.0, 6),
+            gross_funding=round(gross, 2), total_costs=round(costs, 2),
+            opens=opens, unwinds=unwinds,
+            pct_time_deployed=round(on / len(data), 4),
+            avg_funding_annual=round(total_ann, 6)))
+        curves[asset] = (times, navs)
+
+    # blend sleeves on the union timeline (step-interpolate each sleeve)
+    all_times = sorted(set(t for ts, _ in curves.values() for t in ts))
+    idx = {a: 0 for a in assets}
+    blended: list[float] = []
+    for t in all_times:
+        total = 0.0
+        for a in assets:
+            ts, ns = curves[a]
+            i = idx[a]
+            while i + 1 < len(ts) and ts[i + 1] <= t:
+                i += 1
+            idx[a] = i
+            total += ns[i] if ts[i] <= t else nav_start / len(assets)
+        blended.append(total)
+
+    years = (all_times[-1] - all_times[0]) / _MS_PER_YEAR
+    nav_final = blended[-1]
+    apy = (nav_final / nav_start) ** (1.0 / years) - 1.0 if years > 0 else 0.0
+
+    # rolling 1-year blended returns (timestamp-based window) -> regime range
+    year_ms = 365 * 24 * 3600 * 1000
+    roll: list[float] = []
+    j = 0
+    for k in range(len(all_times)):
+        while all_times[j] < all_times[k] - year_ms:
+            j += 1
+        if all_times[k] - all_times[j] >= int(0.98 * year_ms) and blended[j] > 0:
+            roll.append(blended[k] / blended[j] - 1.0)
+    today = roll[-1] if roll else apy
+    roll_sorted = sorted(roll) if roll else [apy]
+    rng = [round(roll_sorted[0], 6), round(roll_sorted[len(roll_sorted) // 2], 6),
+           round(roll_sorted[-1], 6)]
+
+    return HlCarryBacktestResult(
+        start=all_times[0], end=all_times[-1], years=round(years, 3),
+        nav_start=nav_start, nav_final=round(nav_final, 2),
+        apy=round(apy, 6), max_drawdown=round(_max_drawdown(blended), 6),
+        leverage=lev, capital_efficiency=round(eff, 4),
+        sleeves=sleeves, annual_range=rng, today_apy=round(today, 6),
+        nav_curve=_downsample(all_times, blended, curve_points),
+    )
+
+
+# --------------------------------------------------------------------------- #
 # STACKED backtest — the BasisYield mechanism on Canton: RWA-collateralized carry.
 # Two sleeves: (1) pure RWA (repo/MMF), (2) carry sleeve whose collateral is a
 # tokenized T-bill (earns base yield ALWAYS) AND margins a delta-neutral crypto
@@ -435,6 +625,21 @@ def run_stacked_backtest(
 
 def main() -> None:
     base = Path(__file__).resolve().parent.parent / "data"
+
+    # THE HERO — real Hyperliquid funding, short BTC/ETH perp + long cBTC/cETH
+    hl = {u: base / f"hl_{u.lower()}_funding.json" for u in ("BTC", "ETH")}
+    if all(p.exists() for p in hl.values()):
+        by_asset = {("CBTC" if u == "BTC" else "CETH"): load_funding(p)
+                    for u, p in hl.items()}
+        c = run_hl_carry_backtest(by_asset)
+        (base / "hl_carry_backtest_result.json").write_text(json.dumps(asdict(c)))
+        lo, med, hi = (x * 100 for x in c.annual_range)
+        print(f"[HL CARRY hero] {c.years:.2f}y  APY {c.apy:.2%}  maxDD {c.max_drawdown:.2%}  "
+              f"{c.leverage}x (cap-eff {c.capital_efficiency:.0%})")
+        for s in c.sleeves:
+            print(f"  {s.asset}: APY {s.apy:.2%}  deployed {s.pct_time_deployed:.0%}  "
+                  f"opens/unwinds {s.opens}/{s.unwinds}  avg funding {s.avg_funding_annual:.2%}")
+        print(f"  rolling-1y range: {lo:.1f}% / {med:.1f}% / {hi:.1f}%  (today {c.today_apy:.2%})")
 
     funding_path = base / "btc_funding.json"
     rates_path = base / "rwa_rates.json"

@@ -61,14 +61,19 @@ template Vault
         sh <- fetch holdingCid
         archive holdingCid
         let pps = pricePerShare totalAssets totalShares
-        let amount = sh.shares * pps
+        -- Numeric-10 dust guard: pps rounds at 10 dp, so shares × pps can
+        -- exceed totalAssets by a rounding hair on the final redemption. A
+        -- redeemer can never take more than the vault holds.
+        let amount = min (sh.shares * pps) totalAssets
         v <- create this with
           totalAssets = totalAssets - amount
           totalShares = totalShares - sh.shares
         pure (v, amount)
 
-    -- Manager proposes a delta-neutral rebalance; operator approves (the Basis
-    -- yield source — executes the legs via the venue adapters, see Venue.daml).
+    -- === Cash-and-carry workflow (THE HERO this phase) ===
+    -- Manager (the off-chain strategy engine reading Hyperliquid funding)
+    -- proposes a delta-neutral pair: short HL perp + long cBTC/cETH spot
+    -- custodied on Canton. Operator approves at the oracle mark.
     nonconsuming choice Vault_ProposeRebalance : ContractId RebalanceProposal
       with
         plan : RebalancePlan
@@ -77,9 +82,44 @@ template Vault
         create RebalanceProposal with
           operator; manager; auditor; vaultCid = self; plan
 
-    -- === RWA yield-source allocation workflow (the hero) ===
-    -- create: manager proposes allocating capital to a tokenized-RWA source
-    -- (repo / MMF / credit); operator approves at the rate feed.
+    -- update status: mark REALIZED funding received by the short leg at the
+    -- oracle funding-rate feed and credit it to NAV. Repeatable; no phantom
+    -- yield — only `shortNotional × rate × yearFraction` actually received.
+    -- The sign guard lives off-chain: when trailing funding decays the engine
+    -- unwinds instead of accruing (funding never accrues negative here because
+    -- the vault never HOLDS through negative regimes).
+    choice Vault_AccrueFunding : (ContractId Vault, ContractId DeltaNeutralPosition)
+      with
+        positionCid : ContractId DeltaNeutralPosition
+        rateFeedCid : ContractId RateFeed
+        yearFraction : Decimal
+      controller operator
+      do
+        pos <- fetch positionCid
+        feed <- fetch rateFeedCid
+        assertMsg "funding feed must be a Basis-kind rate" (feed.kind == Basis)
+        assertMsg "yearFraction must be in (0, 1]"
+          (yearFraction > 0.0 && yearFraction <= 1.0)
+        let earned = pos.shortNotional * feed.annualizedRate * yearFraction
+        archive positionCid
+        newPos <- create pos with fundingAccrued = pos.fundingAccrued + earned
+        newVault <- create this with totalAssets = totalAssets + earned
+        pure (newVault, newPos)
+
+    -- fulfill: unwind the pair (both legs close; capital back to idle NAV —
+    -- realized funding was already credited on accrual). The off-chain sign
+    -- guard calls this when trailing funding APR falls below the exit floor.
+    nonconsuming choice Vault_UnwindPosition : ()
+      with
+        positionCid : ContractId DeltaNeutralPosition
+      controller operator
+      do exercise positionCid DeltaNeutralPosition_Unwind
+
+    -- === RWA yield-source allocation workflow (NEXT PHASE) ===
+    -- As tokenized RWAs ship on Canton (DBS gold, Treasury repo, MMFs) the
+    -- vault allocates to them through the same propose→approve seam.
+    -- create: manager proposes allocating capital to a tokenized-RWA source;
+    -- operator approves at the rate feed.
     nonconsuming choice Vault_ProposeAllocation : ContractId AllocationProposal
       with
         plan : AllocationPlan
@@ -244,10 +284,12 @@ template RebalanceProposal
     signatory manager
     observer operator, auditor
 
-    -- Operator approves: open the short PerpSwap + long Helvet legs at the
-    -- oracle mark, guard net delta ≈ 0, and record the live position. Consuming,
-    -- so a proposal is acted on once. MOCK venue fills (see BasisVault.Venue) —
-    -- the real PerpSwap/Helvet adapters drop into the leg creation below.
+    -- Operator approves: open the short Hyperliquid perp + long Canton-spot
+    -- legs at the oracle mark, guard net delta ≈ 0, and record the live
+    -- position. Consuming, so a proposal is acted on once. MOCK venue fills
+    -- (see BasisVault.Venue) — the real adapters (HL agent-key executor for
+    -- the short; CIP-56 Holding/TransferInstruction for the cBTC/cETH long)
+    -- drop into the leg creation below.
     choice RebalanceProposal_Approve : ContractId DeltaNeutralPosition
       with
         priceFeedCid : ContractId PriceFeed   -- oracle-anchored mark
@@ -278,8 +320,9 @@ template RebalanceProposal
           shortLeg; longLeg
           shortNotional; longNotional
           markPrice = feed.price
-          collateralAsset = plan.collateralAsset   -- RWA-collateralized carry
+          collateralAsset = plan.collateralAsset   -- USDCx now; RWA next phase
           collateralRate = plan.collateralRate
+          fundingAccrued = 0.0
 
     choice RebalanceProposal_Reject : ()
       controller operator

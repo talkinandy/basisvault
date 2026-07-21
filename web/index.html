@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BasisYield · on Canton Network — auditable RWA yield</title>
-<meta name="description" content="Institutional real-world-asset yield you can audit — tokenized-Treasury repo + money-market yield on the Canton Network, with need-to-know privacy.">
+<meta name="description" content="Market-neutral funding carry you can audit — short the Hyperliquid perp, long cBTC/cETH custodied on the Canton Network, with need-to-know privacy.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Hanken+Grotesk:wght@500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
@@ -187,20 +187,22 @@ a{color:inherit;text-decoration:none}
     <div class="hero-sun"></div>
     <div class="hero-grid">
       <div>
-        <span class="eyebrow">Market-neutral RWA carry · auditable · private</span>
-        <h1 class="h1" style="margin:16px 0">Yield that <span class="u-grad">stacks</span>. Risk that doesn't.</h1>
-        <p class="lead">BasisYield stacks tokenized-Treasury yield <b>with</b> delta-neutral funding
-          carry on Canton — your collateral earns T-bill yield <i>while</i> it powers the trade.
-          Market-neutral, capital-preserving, and <b>need-to-know private</b>.</p>
+        <span class="eyebrow">Market-neutral funding carry · auditable · private</span>
+        <h1 class="h1" style="margin:16px 0">Leveraged traders pay <span class="u-grad">rent</span>. This vault collects it.</h1>
+        <p class="lead">Perp longs pay funding every hour to hold their positions. BasisYield shorts the
+          BTC/ETH perp on Hyperliquid and holds <b>cBTC/cETH on Canton</b> — price risk cancelled,
+          funding collected. The <a href="https://basisyield.com" style="color:inherit">production BasisYield
+          mechanism</a>, with the spot leg in institutional Canton custody and the whole book
+          <b>need-to-know private</b>.</p>
         <div class="hero-cta">
-          <a class="btn btn-accent" href="#stack">How the yield stacks</a>
+          <a class="btn btn-accent" href="#stack">How the carry works</a>
           <a class="btn btn-ghost" href="#privacy">Privacy demo</a>
         </div>
       </div>
       <div class="statgrid" id="herostats">
-        <div class="stat"><div class="v green" id="s-range">—</div><div class="l">Blended yield range</div><div class="s">market-neutral · regime-dependent</div></div>
-        <div class="stat"><div class="v" id="s-today">—</div><div class="l">Today</div><div class="s">funding-rich regime</div></div>
-        <div class="stat"><div class="v" id="s-avg">—</div><div class="l">5-yr avg APY</div><div class="s">backtested, real data</div></div>
+        <div class="stat"><div class="v green" id="s-range">—</div><div class="l">Rolling-1y yield range</div><div class="s">market-neutral · regime-dependent</div></div>
+        <div class="stat"><div class="v" id="s-today">—</div><div class="l">Today's regime</div><div class="s">trailing 1y, funding compressed</div></div>
+        <div class="stat"><div class="v" id="s-avg">—</div><div class="l">3.2-yr APY</div><div class="s">real Hyperliquid funding</div></div>
         <div class="stat"><div class="v" id="s-dd">—</div><div class="l">Max drawdown</div><div class="s">capital-preserving</div></div>
       </div>
     </div>
@@ -209,13 +211,14 @@ a{color:inherit;text-decoration:none}
 
 <section class="section" id="how"><div class="wrap">
   <span class="kicker">How it works</span>
-  <h2 class="h2" style="margin:10px 0 4px">Four moves. No price bets. No phantom yield.</h2>
-  <p class="lead" style="max-width:60ch">You deposit. The vault lends into tokenized real-world-asset
-    yield. Yield accrues to NAV — only what's actually earned. You redeem at a higher NAV.</p>
+  <h2 class="h2" style="margin:10px 0 4px">Hold both sides. Keep only the gap.</h2>
+  <p class="lead" style="max-width:62ch">You deposit USDCx. The vault opens equal-notional pairs —
+    short the perp, long the spot — so price moves cancel and hourly funding is all that's left.
+    Only what's actually received accrues to NAV. You redeem at a higher NAV.</p>
   <div class="steps">
-    <div class="step"><div class="n">1</div><h4>Deposit</h4><p>Deposit stablecoins/cash into the vault and receive shares at NAV. You are the <b>holder</b>.</p></div>
-    <div class="step"><div class="n">2</div><h4>Allocate</h4><p>The strategy allocates across tokenized-Treasury <b>repo</b> + <b>MMF</b> yield — diversified, risk-ranked, capital buffered.</p></div>
-    <div class="step"><div class="n">3</div><h4>Accrue</h4><p>Yield is marked to an <b>oracle rate</b> and credited to NAV — <b>realized only</b>, never projected.</p></div>
+    <div class="step"><div class="n">1</div><h4>Deposit</h4><p>Deposit <b>USDCx</b> into the vault and receive shares at NAV. You are the <b>holder</b>.</p></div>
+    <div class="step"><div class="n">2</div><h4>Open the pair</h4><p>Short BTC/ETH perp on <b>Hyperliquid</b> + long <b>cBTC/cETH</b> custodied on Canton, equal notional — net delta 0, enforced on-chain.</p></div>
+    <div class="step"><div class="n">3</div><h4>Collect funding</h4><p>Hourly funding is marked to an <b>oracle feed</b> and credited to NAV — <b>realized only</b>. If trailing funding decays, the <b>sign guard</b> unwinds both legs: the short never pays rent.</p></div>
     <div class="step"><div class="n">4</div><h4>Redeem</h4><p>Redeem anytime at the higher NAV/share. Every step is on-chain and auditable.</p></div>
   </div>
   <div class="roles">
@@ -250,31 +253,38 @@ a{color:inherit;text-decoration:none}
 </div></section>
 
 <section class="section" id="stack"><div class="wrap">
-  <span class="kicker">Where the yield comes from</span>
-  <h2 class="h2" style="margin:10px 0 4px">Your collateral works twice.</h2>
-  <p class="lead" style="max-width:64ch">A delta-neutral carry (short perp + long spot) collects funding
-    with no price bet. On Hyperliquid the cash margining it earns <b>nothing</b>. On Canton that cash is a
-    <b>tokenized T-bill</b> — it earns base yield <i>and</i> margins the carry. You stack both legs.</p>
+  <span class="kicker">Where the number comes from</span>
+  <h2 class="h2" style="margin:10px 0 4px">Real funding, real venue, honest arithmetic.</h2>
+  <p class="lead" style="max-width:64ch">The short leg trades on Hyperliquid — so the backtest uses
+    <b>Hyperliquid's own funding prints</b>, every hour for 3.2 years. Capture is funding ×
+    capital efficiency: spot uses 1× notional, perp margin 1/L, so at <span id="m-lev">5</span>×
+    leverage <span id="m-eff">83%</span> of every deployed dollar earns.</p>
   <div class="stackgrid">
     <div class="card">
-      <div class="h3" style="margin-bottom:6px">Same trade, same dollar</div>
-      <table class="cmp">
-        <tr><th></th><th style="text-align:right">Hyperliquid</th><th style="text-align:right">Canton · BasisYield</th></tr>
-        <tr><td>Collateral</td><td class="num hl">USDC → 0%</td><td class="num ct" id="cmp-coll">T-bill → —</td></tr>
-        <tr><td>+ Funding carry</td><td class="num hl" id="cmp-fund-hl">—</td><td class="num ct" id="cmp-fund">—</td></tr>
-        <tr class="tot"><td>= Carry-sleeve yield</td><td class="num" id="cmp-hl-tot">—</td><td class="num ct" id="cmp-ct-tot">—</td></tr>
-      </table>
-      <p class="note">Idle margin is dead weight on a crypto venue. RWA collateral makes it productive — the Canton edge.</p>
+      <div class="h3" style="margin-bottom:12px">3.2-yr backtest, by asset</div>
+      <div class="bar"><span class="lab">Avg BTC funding (HL)</span><span class="track"><span class="fill fund" id="b-fbtc"></span></span><span class="val" id="v-fbtc">—</span></div>
+      <div class="bar total"><span class="lab">cBTC sleeve APY</span><span class="track"><span class="fill base" id="b-abtc"></span></span><span class="val" id="v-abtc">—</span></div>
+      <div class="bar"><span class="lab">Avg ETH funding (HL)</span><span class="track"><span class="fill fund" id="b-feth"></span></span><span class="val" id="v-feth">—</span></div>
+      <div class="bar total"><span class="lab">cETH sleeve APY</span><span class="track"><span class="fill base" id="b-aeth"></span></span><span class="val" id="v-aeth">—</span></div>
+      <div class="bar total"><span class="lab">Blended vault APY</span><span class="track"><span class="fill rwa" id="b-blend"></span></span><span class="val" id="v-blend">—</span></div>
+      <p class="note">Sleeve APY &lt; avg funding because capture is sign-guarded (deployed
+        <span id="v-dep">—</span> of hours), pays both-legs costs on every round trip, and earns on
+        83% of capital. Nothing annualized off a good week.</p>
     </div>
     <div class="card">
-      <div class="h3" style="margin-bottom:12px">Blended vault — 5-yr backtest</div>
-      <div class="bar"><span class="lab">RWA base (collateral)</span><span class="track"><span class="fill base" id="b-coll"></span></span><span class="val" id="v-coll">—</span></div>
-      <div class="bar"><span class="lab">+ Funding carry</span><span class="track"><span class="fill fund" id="b-fund"></span></span><span class="val" id="v-fund">—</span></div>
-      <div class="bar total"><span class="lab">= Carry sleeve</span><span class="track"><span class="fill base" id="b-carry" style="opacity:.85"></span></span><span class="val" id="v-carry">—</span></div>
-      <div class="bar"><span class="lab">Pure-RWA sleeve</span><span class="track"><span class="fill rwa" id="b-rwa"></span></span><span class="val" id="v-rwa">—</span></div>
-      <div class="bar total"><span class="lab">Blended (60/40)</span><span class="track"><span class="fill fund" id="b-blend"></span></span><span class="val" id="v-blend">—</span></div>
-      <p class="note">Carry sleeve = T-bill collateral + delta-neutral funding (sign-guarded, realized only).
-        Funding is regime-dependent — avg <span id="v-avgfund">—</span> over the window.</p>
+      <div class="h3" style="margin-bottom:6px">Same mechanism as basisyield.com — better custody</div>
+      <table class="cmp">
+        <tr><th></th><th style="text-align:right">Hyperliquid-only</th><th style="text-align:right">Canton · BasisYield</th></tr>
+        <tr><td>Short (funding) leg</td><td class="num hl">HL perp</td><td class="num ct">HL perp — unchanged</td></tr>
+        <tr><td>Long (spot) leg</td><td class="num hl">HL spot</td><td class="num ct">cBTC/cETH · Canton custody</td></tr>
+        <tr><td>Who can audit the book</td><td class="num hl">no one</td><td class="num ct">auditor party — everything, live</td></tr>
+        <tr class="tot"><td>Margin earns</td><td class="num">0%</td><td class="num ct">0% now → RWA yield next</td></tr>
+      </table>
+      <p class="note" style="margin-top:10px"><b>Next phase — your margin works twice.</b> As tokenized RWAs
+        ship on Canton (DBS gold token, tokenized T-bills), the margin itself earns
+        <span id="np-coll">—</span> base yield <i>while</i> it backs the carry: backtested
+        <span id="np-carry">—</span> carry-sleeve APY over 5y. Dead margin is the fee every
+        crypto venue charges; Canton removes it.</p>
     </div>
   </div>
 </div></section>
@@ -297,7 +307,7 @@ a{color:inherit;text-decoration:none}
 
 <section class="section" id="proof"><div class="wrap">
   <span class="kicker">Honest proof</span>
-  <h2 class="h2" style="margin:10px 0 18px">Backtested on 5 years of real funding + rates.</h2>
+  <h2 class="h2" style="margin:10px 0 18px">Backtested on 3.2 years of hourly Hyperliquid funding.</h2>
   <div class="chartwrap">
     <div class="chartcard">
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
@@ -307,39 +317,43 @@ a{color:inherit;text-decoration:none}
     </div>
     <div>
       <div class="bt-stats">
-        <div class="bt-stat"><div class="v green" id="bt-apy">—</div><div class="l">5-yr blended APY</div></div>
+        <div class="bt-stat"><div class="v green" id="bt-apy">—</div><div class="l">3.2-yr blended APY</div></div>
         <div class="bt-stat"><div class="v" id="bt-dd">—</div><div class="l">Max drawdown</div></div>
         <div class="bt-stat"><div class="v" id="bt-range">—</div><div class="l">Rolling-1y range</div></div>
         <div class="bt-stat"><div class="v" id="bt-today">—</div><div class="l">Today (trailing 1y)</div></div>
       </div>
-      <p class="note">Non-lookahead replay of the live strategy with real turnover costs, idle
-        cash earning zero, sign-guarded funding, and <b>realized yield only</b>. Real BTC funding
-        (Binance) + SOFR/3M-T-bill (FRED) stand in for Canton's tokenized-RWA-collateralized carry
-        until those carry on-chain feeds. Conservative — 1× notional, no leverage.</p>
+      <p class="note">Non-lookahead replay of the production entry/exit rules on <b>every hourly
+        funding print Hyperliquid has ever paid</b> for BTC and ETH: decide on the trailing 3-day
+        window, accrue the next print, pay both-legs costs on every open and unwind, and never hold
+        through a negative regime (sign guard). Perp leverage capped at 5× by the liquidation
+        buffer — <b>realized funding only</b>. The range is every rolling year in the data,
+        worst to best — today's compressed regime sits at the bottom of it.</p>
     </div>
   </div>
 </div></section>
 
 <section class="section" id="canton"><div class="wrap">
-  <span class="kicker" style="color:var(--canton)">Why Canton — and where it's going</span>
-  <h2 class="h2" style="margin:10px 0 4px">Built for the RWA market Canton is bringing on-chain.</h2>
-  <p class="lead" style="max-width:64ch">We don't depend on what's live today — we're built behind clean
-    seams for the tokenized-RWA infrastructure Canton and its institutions are shipping.</p>
+  <span class="kicker" style="color:var(--canton)">Why Canton — today and next</span>
+  <h2 class="h2" style="margin:10px 0 4px">Built on what Canton has now. Ready for what ships next.</h2>
+  <p class="lead" style="max-width:64ch">This phase runs entirely on Canton's live asset menu — no
+    wishful dependencies. Each new tokenized RWA becomes the next carry asset or the next margin,
+    behind the same on-chain workflow you ran above.</p>
   <div class="rmgrid">
-    <div class="rm"><div class="big">$344B</div><h4>RWA already on Canton</h4><p>Represented real-world-asset value on the network (rwa.xyz, May 2026) — bonds, funds, repos, more.</p></div>
-    <div class="rm"><div class="big">Oct 2026</div><h4>DTCC tokenized US Treasuries</h4><p>DTCC + Digital Asset launch tokenized USTs on Canton; 50+ firms incl. BlackRock & JPMorgan. Our repo source plugs straight in.</p></div>
-    <div class="rm"><div class="big">Live</div><h4>On-chain Treasury repo</h4><p>24/7 atomic UST repo financing vs stablecoins already demonstrated on Canton — exactly our hero yield source.</p></div>
+    <div class="rm"><div class="big">Live</div><h4>cBTC · cETH · USDCx</h4><p>The assets this vault uses today: cBTC (BitSafe — Quantstamp-audited, Chainlink feeds), cETH (OnRails), USDCx (Circle xReserve). All CIP-56 token standard.</p></div>
+    <div class="rm"><div class="big">H2 2026</div><h4>Tokenized gold</h4><p>DBS's physical gold token brings the next carry pair (gold spot vs XAU perp) — and the first RWA margin that earns while it backs the trade.</p></div>
+    <div class="rm"><div class="big">$344B</div><h4>RWA pipeline on Canton</h4><p>DTCC tokenized US Treasuries land Oct 2026 (50+ firms incl. BlackRock & JPMorgan) — T-bill margin and repo carry plug into the same seams.</p></div>
   </div>
-  <p class="note">Privacy is why DTCC chose Canton — and why BasisYield can show an auditor everything
-    while showing a counterparty nothing. As tokenized Treasuries, MMFs and credit ship, each becomes
-    a yield source behind the same on-chain workflow you see above.</p>
+  <p class="note">Privacy is why institutions choose Canton — and why BasisYield can show an auditor
+    everything while showing a counterparty nothing. A delta-neutral book that's <i>public</i> is a
+    book that gets traded against; need-to-know disclosure is what makes running it on-chain viable
+    at all.</p>
 </div></section>
 
 <div class="wrap">
   <div class="footer">
     <div class="brand" style="font-size:17px"><span class="mark" style="width:28px;height:28px;font-size:16px">B</span>BasisYield</div>
     <span class="built-on">Built on <img src="/assets/canton-logo-black.svg" alt="Canton Network" class="canton-logo" style="height:20px"></span>
-    <div>HackCanton League S2 · <span class="demobadge">demo — mock seams, testnet-ready</span></div>
+    <div>HackCanton League S2 · <span class="demobadge">live Canton sandbox · HL execution mocked</span></div>
   </div>
   <p class="tmnotice">Canton is a registered trademark of Digital Asset (Switzerland) GmbH. Digital Asset
     is not affiliated with, and has not sponsored or endorsed, BasisYield. Demonstration project for
@@ -389,56 +403,58 @@ function renderBook(b){
     return;
   }
   // auditor
-  const rows=b.allocations.map(a=>`<tr><td><b>${a.kind}</b> · ${a.asset}</td>
-    <td class="num">${a.weightPct}%</td><td class="num">${a.ratePct}%</td><td class="num">${fmtUsd(a.notional)}</td></tr>`).join('');
-  const na=b.networkActivity||{};
+  const rows=b.positions.map(p=>`<tr><td><b>${p.underlying}</b><br>
+    <span style="opacity:.65;font-size:12px">${p.shortLeg}<br>${p.longLeg}</span></td>
+    <td class="num">${pct(p.fundingAprPct)}</td><td class="num">${p.netDelta.toFixed(1)}</td><td class="num">${fmtUsd(p.notional)}</td></tr>`).join('');
   el.innerHTML=`<div class="bookhead"><div class="h3">Full vault book</div><span class="vbadge full">Full visibility</span></div>
-    <table class="btable"><thead><tr><th>RWA yield source</th><th style="text-align:right">Weight</th><th style="text-align:right">Rate</th><th style="text-align:right">Allocated</th></tr></thead>
+    <table class="btable"><thead><tr><th>Carry pair</th><th style="text-align:right">Funding APR</th><th style="text-align:right">Net Δ</th><th style="text-align:right">Notional</th></tr></thead>
     <tbody>${rows}</tbody></table>
     <div class="kpis">
-      <div class="kpi"><div class="v green">${pct(b.blendedYieldPct)}</div><div class="l">Blended yield</div></div>
-      <div class="kpi"><div class="v">${fmtUsd(na.routedNotional||0)}</div><div class="l">On-chain volume routed</div></div>
-      <div class="kpi"><div class="v">${na.rebalanceCount||0}</div><div class="l">Rebalances</div></div>
+      <div class="kpi"><div class="v green">${pct(b.blendedYieldPct)}</div><div class="l">Current blended capture</div></div>
+      <div class="kpi"><div class="v">${b.leverage}×</div><div class="l">Perp leverage</div></div>
+      <div class="kpi"><div class="v">${pct(b.capitalEfficiencyPct)}</div><div class="l">Capital efficiency</div></div>
       <div class="kpi"><div class="v">${b.holders}</div><div class="l">Holders</div></div>
     </div>
-    ${b.basisPosition?`<p style="color:rgba(255,255,255,.6);font-size:13px;margin-top:14px">+ secondary delta-neutral basis source: net delta ${b.basisPosition.netDelta}, carry ${pct(b.basisPosition.carryPct)}.</p>`:''}
     <p style="color:rgba(255,255,255,.55);font-size:13px;margin-top:6px">${b.note}</p>`;
 }
 
-function renderStacked(st){
-  const k=st.stacking||{};
-  $('#s-range').textContent=`${(st.lowPct||0).toFixed(1)}–${(st.highPct||0).toFixed(1)}%`;
-  $('#s-today').textContent='~'+(st.todayPct||0).toFixed(1)+'%';
-  $('#s-avg').textContent=pct(st.blendedApyPct);
-  $('#s-dd').textContent=pct(st.maxDrawdownPct);
-  // comparison card
-  $('#cmp-coll').textContent='T-bill → '+pct(k.collateralPct);
-  $('#cmp-fund').textContent='funding → '+pct(k.fundingPct);
-  $('#cmp-fund-hl').textContent='funding → '+pct(k.fundingPct);
-  $('#cmp-hl-tot').textContent=pct(k.fundingPct);                 // HL: 0 + funding
-  $('#cmp-ct-tot').textContent=pct(k.carrySleevePct);             // Canton: T-bill + funding
-  // breakdown bars (scale to the carry sleeve as 100%)
-  const mx=Math.max(k.carrySleevePct,k.collateralPct+k.fundingPct,st.blendedApyPct,1);
-  const w=v=>Math.max(2,Math.min(100,v/mx*100)).toFixed(0)+'%';
-  $('#b-coll').style.width=w(k.collateralPct); $('#v-coll').textContent=pct(k.collateralPct);
-  $('#b-fund').style.width=w(k.fundingPct);   $('#v-fund').textContent='+'+pct(k.fundingPct);
-  $('#b-carry').style.width=w(k.carrySleevePct);$('#v-carry').textContent=pct(k.carrySleevePct);
-  $('#b-rwa').style.width=w(k.rwaSleevePct);   $('#v-rwa').textContent=pct(k.rwaSleevePct);
-  $('#b-blend').style.width=w(st.blendedApyPct);$('#v-blend').textContent=pct(st.blendedApyPct);
-  $('#v-avgfund').textContent=pct(k.avgFundingPct);
+function renderCarry(c, st){
+  // hero
+  $('#s-range').textContent=`${(c.lowPct||0).toFixed(1)}–${(c.highPct||0).toFixed(1)}%`;
+  $('#s-today').textContent='~'+(c.todayPct||0).toFixed(1)+'%';
+  $('#s-avg').textContent=pct(c.apyPct);
+  $('#s-dd').textContent=pct(c.maxDrawdownPct);
+  // mechanism card
+  $('#m-lev').textContent=c.leverage||5;
+  $('#m-eff').textContent=Math.round(c.capitalEfficiencyPct||83)+'%';
+  const by=Object.fromEntries((c.sleeves||[]).map(s=>[s.asset,s]));
+  const btc=by.CBTC||{}, eth=by.CETH||{};
+  const mx=Math.max(btc.avgFundingPct||0, eth.avgFundingPct||0, c.apyPct||0, 1);
+  const w=v=>Math.max(2,Math.min(100,(v||0)/mx*100)).toFixed(0)+'%';
+  $('#b-fbtc').style.width=w(btc.avgFundingPct); $('#v-fbtc').textContent=pct(btc.avgFundingPct);
+  $('#b-abtc').style.width=w(btc.apyPct);        $('#v-abtc').textContent=pct(btc.apyPct);
+  $('#b-feth').style.width=w(eth.avgFundingPct); $('#v-feth').textContent=pct(eth.avgFundingPct);
+  $('#b-aeth').style.width=w(eth.apyPct);        $('#v-aeth').textContent=pct(eth.apyPct);
+  $('#b-blend').style.width=w(c.apyPct);         $('#v-blend').textContent=pct(c.apyPct);
+  const depLo=Math.min(btc.deployedPct||0, eth.deployedPct||0), depHi=Math.max(btc.deployedPct||0, eth.deployedPct||0);
+  $('#v-dep').textContent=`${depLo.toFixed(0)}–${depHi.toFixed(0)}%`;
+  // next-phase (stacked projection)
+  const k=(st||{}).stacking||{};
+  $('#np-coll').textContent=pct(k.collateralPct);
+  $('#np-carry').textContent=pct(k.carrySleevePct);
   // proof
-  $('#bt-apy').textContent=pct(st.blendedApyPct);
-  $('#bt-dd').textContent=pct(st.maxDrawdownPct);
-  $('#bt-range').textContent=`${(st.lowPct||0).toFixed(1)}–${(st.highPct||0).toFixed(1)}%`;
-  $('#bt-today').textContent='~'+(st.todayPct||0).toFixed(1)+'%';
-  $('#bt-source').textContent=st.source||'';
-  chart(st.navCurve, st.navStart);
+  $('#bt-apy').textContent=pct(c.apyPct);
+  $('#bt-dd').textContent=pct(c.maxDrawdownPct);
+  $('#bt-range').textContent=`${(c.lowPct||0).toFixed(1)}–${(c.highPct||0).toFixed(1)}%`;
+  $('#bt-today').textContent='~'+(c.todayPct||0).toFixed(1)+'%';
+  $('#bt-source').textContent=c.source||'';
+  chart(c.navCurve, c.navStart);
 }
 
 async function load(role){
   document.querySelectorAll('#seg button').forEach(x=>x.classList.toggle('on',x.dataset.r===role));
   const s=await (await fetch('/api/state?role='+role)).json();
-  renderStacked(s.overview.stacked||{});
+  renderCarry(s.overview.carry||{}, s.overview.stacked||{});
   renderBook(s.book);
 }
 document.querySelectorAll('#seg button').forEach(b=>b.onclick=()=>load(b.dataset.r));
@@ -446,7 +462,7 @@ load('auditor');
 
 /* ---- lifecycle runner ---- */
 let lcRole='observer';
-const STEP_LABELS={deposit:'1 · Deposit',allocate:'2 · Allocate',accrue:'3 · Accrue',transfer:'4 · Transfer',close:'5 · Fulfill',redeem:'6 · Redeem'};
+const STEP_LABELS={deposit:'1 · Deposit',open:'2 · Open carry',accrue:'3 · Accrue funding',transfer:'4 · Transfer',unwind:'5 · Unwind',redeem:'6 · Redeem'};
 function renderLC(s){
   $('#lc-steps').innerHTML=s.steps.map((st,i)=>{
     const cls=i<s.done?'done':(st===s.next?'next':'');

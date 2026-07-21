@@ -30,7 +30,8 @@ systemctl disable --now basisvault-dashboard    # stop + don't start on boot
 ```bash
 cd /root/basisvault && git pull
 # if engine deps changed: engine/.venv/bin/pip install -e 'engine[dashboard]'
-# if backtest data changed: (cd engine && .venv/bin/python -m basisvault_engine.backtest)
+# refresh funding data + backtests: (cd engine && .venv/bin/python scripts/fetch_hl_funding.py && .venv/bin/python -m basisvault_engine.backtest)
+# if the Daml model changed: daml build && systemctl restart basisvault-sandbox
 systemctl restart basisvault-dashboard
 ```
 

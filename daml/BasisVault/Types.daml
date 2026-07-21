@@ -1,39 +1,50 @@
 -- BasisVault shared types (no templates → safe to import anywhere).
 module BasisVault.Types where
 
--- Underlying we run delta-neutral carry on.
+-- Underlying we run delta-neutral carry on. This phase Canton's asset menu is
+-- stablecoins (USDCx) + wrapped majors — so the carry longs are cBTC (BitSafe,
+-- CIP-56) and cETH (OnRails, CIP-56). `Tokenized` covers next-phase longs
+-- (e.g. the DBS physical gold token) behind the same seam.
 data Underlying
-  = CBTC          -- Canton BTC (Helvet Swap pair)
-  | CC            -- Canton Coin
-  | Tokenized Text  -- a tokenized RWA symbol, for the RWA-track stretch
+  = CBTC            -- BitSafe cBTC — 1:1 wrapped BTC, CIP-56, live on Canton
+  | CETH            -- OnRails cETH — 1:1 wrapped ETH, CIP-56
+  | CC              -- Canton Coin
+  | Tokenized Text  -- a tokenized RWA symbol (gold, T-bills) — next phase
   deriving (Eq, Show)
 
--- Where a leg executes (HackCanton venue stack).
+-- Where a leg executes. The short (funding) leg lives OFF-Canton on Hyperliquid
+-- — the venue the production BasisYield engine already trades — executed by the
+-- operator's trade-only agent key and attested on-ledger as a VenueLeg. The
+-- long leg is spot custodied ON Canton (bought via a Canton DEX).
 data Venue
-  = PerpSwap          -- levered swaps (the short funding leg)
-  | HelvetSwap        -- AMM, CBTC/CC (the long / spot leg)
+  = Hyperliquid       -- perp short leg (receives funding) — off-Canton
+  | Cantex            -- live Canton DEX (CC/CBTC, CC/USDC pairs) — spot long leg
+  | PerpSwap          -- future Canton-native perps (e.g. Canborsa) — next phase
+  | HelvetSwap        -- AMM CBTC/CC
   | TempleLightspeed  -- institutional order book
   deriving (Eq, Show)
 
 data Side = Long | Short
   deriving (Eq, Show)
 
--- A vault yield source. RWA sources are the hero (Canton's flagship use case —
--- tokenized-Treasury repo, money-market funds, credit); Basis (delta-neutral
--- funding/basis carry) is kept as one secondary source.
+-- A vault yield source. THIS PHASE the hero is Basis — delta-neutral cash-and-
+-- carry (short HL perp + long cBTC/cETH on Canton) — because Canton's live
+-- assets today are stablecoins + cBTC/cETH. Repo/MMF/Gold are the next-phase
+-- sources as tokenized RWAs (DBS gold, T-bills) ship on Canton.
 data YieldSourceKind
-  = Repo      -- tokenized-Treasury repo carry
-  | MMF       -- tokenized money-market-fund base yield
+  = Basis     -- delta-neutral funding carry (THE HERO, live-able today)
+  | Gold      -- tokenized physical gold carry (next phase — DBS gold token)
+  | Repo      -- tokenized-Treasury repo carry (next phase)
+  | MMF       -- tokenized money-market-fund base yield (next phase)
   | Credit    -- tokenized credit (stretch)
-  | Basis     -- delta-neutral funding/basis carry (secondary)
   deriving (Eq, Show)
 
--- A proposed allocation of vault capital to an RWA yield source. Plain data so
+-- A proposed allocation of vault capital to a yield source. Plain data so
 -- the off-chain allocator can hand it to the Vault to authorize.
 data AllocationPlan = AllocationPlan
   with
     kind : YieldSourceKind
-    asset : Text          -- tokenized RWA symbol, e.g. "USTB-3M", "MMF-USD"
+    asset : Text          -- symbol, e.g. "BTC-PERP", "USTB-3M", "XAU-DBS"
     principal : Decimal   -- quote units to deploy
   deriving (Eq, Show)
 
@@ -42,12 +53,13 @@ data AllocationPlan = AllocationPlan
 data RebalancePlan = RebalancePlan
   with
     underlying : Underlying
-    shortVenue : Venue   -- e.g. PerpSwap — receive funding
-    longVenue : Venue    -- e.g. HelvetSwap — cancel price
+    shortVenue : Venue   -- Hyperliquid — receive funding
+    longVenue : Venue    -- Cantex spot — cancel price, custody on Canton
     notional : Decimal   -- equal-notional both legs ⇒ net delta ≈ 0
-    -- RWA-collateralized carry: the margin is a tokenized RWA (e.g. "USTB-3M")
-    -- earning `collateralRate` base yield WHILE it backs the carry — the Canton
-    -- edge (idle margin earns 0 on a crypto venue). "" / 0.0 = uncollateralized.
+    -- What margins the perp short. This phase: USDCx (earns 0 — same as
+    -- Hyperliquid today). Next phase: a tokenized RWA (DBS gold, T-bills)
+    -- earning `collateralRate` base yield WHILE it backs the carry — the
+    -- stacked-yield Canton edge. "" / 0.0 = plain stablecoin margin.
     collateralAsset : Text
     collateralRate : Decimal
   deriving (Eq, Show)

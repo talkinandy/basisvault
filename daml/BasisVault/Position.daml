@@ -22,13 +22,14 @@ template DeltaNeutralPosition
     shortNotional : Decimal
     longNotional : Decimal
     markPrice : Decimal              -- oracle mark at open (not last-trade)
-    collateralAsset : Text          -- tokenized RWA backing the margin ("" if none)
+    collateralAsset : Text          -- what margins the short ("" = plain stablecoin)
     collateralRate : Decimal        -- its base yield, earned WHILE it margins the carry
+    fundingAccrued : Decimal        -- REALIZED funding credited to NAV so far
   where
     signatory operator
     observer manager, auditor
     -- equal-notional hedge ⇒ net delta ≈ 0
-    ensure shortNotional >= 0.0 && longNotional >= 0.0
+    ensure shortNotional >= 0.0 && longNotional >= 0.0 && fundingAccrued >= 0.0
 
     -- Unwind both legs (e.g. when trailing funding turns negative — the sign
     -- guard, mirroring the BasisYield cash-carry auto-unwind). Consuming, so the

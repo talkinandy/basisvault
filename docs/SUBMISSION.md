@@ -3,153 +3,131 @@
 **Track:** Real-World Asset (RWA) & Business Workflows *(primary)* · Investment
 Infrastructure (fund structure) *(secondary framing)*
 **Deadline:** 2026-07-25, 23:59 UTC · **Grand Final:** 2026-08-05, 14:00 UTC
-**Repo:** github.com/talkinandy/basisvault
+**Repo:** github.com/talkinandy/basisvault · **Live:** https://canton.basisyield.com
 
-> **BasisVault** — a privacy-preserving, auditable **tokenized-RWA yield vault**
-> on Canton. It allocates capital across tokenized-Treasury **repo** carry and
-> **money-market-fund** base yield (tokenized credit as a stretch), marks every
-> position to an **oracle rate**, and gives institutions on-chain yield they can
-> **audit** while keeping the book **counterparty-private** via Canton's
-> need-to-know disclosure. A delta-neutral **basis** strategy is one secondary
-> source.
+> **BasisYield on Canton** — a privacy-preserving, auditable **market-neutral
+> yield vault**. It runs the production [basisyield.com](https://basisyield.com)
+> cash-and-carry on Canton's live asset menu: **short the BTC/ETH perp on
+> Hyperliquid** (collect hourly funding) + **long cBTC/cETH custodied on Canton**
+> (cancel price risk). Net delta ≈ 0 enforced on-chain, realized funding only,
+> need-to-know privacy. Next phase: tokenized-RWA margin (DBS gold, T-bills)
+> stacking base yield on the carry.
 
 ---
 
 ## Track requirements → what we deliver
 
-The RWA & Business Workflows track asks for four things:
-
 | Required | BasisVault delivers | Status |
 |---|---|---|
-| **MVP: ≥1 end-to-end workflow** (create → update status → transfer/fulfill → audit/report) | full chain on-chain: `ProposeAllocation`→`Approve` (create) → `AccrueAllocation` (update) → **`ShareHolding_ProposeTransfer`→`Accept`→`Settle` (transfer)** → `CloseAllocation`/redeem (fulfill) → observer sees all (audit). 6 Daml scripts green | ✅ |
-| **Lightweight UI demonstrating roles** (issuer / holder / observer) | the **"Run it yourself" lifecycle panel** on the live site — click through all 6 steps **executing as real Daml transactions on a Canton ledger** (sandbox + JSON Ledger API v2): real tx ids on every event, and the per-role contract counts are the ledger's own ACS answers — **need-to-know enforced by Canton, not the UI**. Mock fallback if the sandbox is down | ✅ live, on-ledger |
-| **1-page business brief** (ICP, use case, who pays, why Canton) | standalone [`BUSINESS_BRIEF.md`](BUSINESS_BRIEF.md) (§3 below is the long form) | ✅ |
-| **Short pilot plan** (2–3 steps + required integrations) | standalone [`PILOT_PLAN.md`](PILOT_PLAN.md) (§4 below is the summary) | ✅ |
+| **MVP: ≥1 end-to-end workflow** (create → update status → transfer/fulfill → audit/report) | full carry lifecycle on-chain: `Vault_ProposeRebalance`→`RebalanceProposal_Approve` (create: open the pair at the oracle mark, net-delta guard) → **`Vault_AccrueFunding`** (update: realized funding → NAV) → `ShareHolding_ProposeTransfer`→`Accept`→`Settle` (transfer) → **`Vault_UnwindPosition`** + redeem (fulfill) → observer sees all (audit). 7 Daml scripts green | ✅ |
+| **Lightweight UI demonstrating roles** (issuer / holder / observer) | the **"Run it yourself" lifecycle panel** on the live site — 6 steps **executing as real Daml transactions on a Canton ledger** (sandbox + JSON Ledger API v2): real tx ids on every event; per-role contract counts are the ledger's own ACS answers — **need-to-know enforced by Canton, not the UI**. Mock fallback if the sandbox is down | ✅ live, on-ledger |
+| **1-page business brief** (ICP, use case, who pays, why Canton) | standalone [`BUSINESS_BRIEF.md`](BUSINESS_BRIEF.md) | ✅ |
+| **Short pilot plan** (2–3 steps + required integrations) | standalone [`PILOT_PLAN.md`](PILOT_PLAN.md) — step 1 names the real cBTC/cETH testnet integrations (BitSafe `cbtc-lib`, CIP-56 `Holding`/`TransferInstruction`) | ✅ |
 
-Cross-cutting judge axes (from S1): **privacy-first** (the Confimarket axis),
-**institutional-grade** (Daml roles), **oracle-anchored** (Chainlink `RateFeed`),
-**security/honesty** (deterministic Daml, **realized yield only — no phantom NAV**),
-**real network activity** (allocations + rebalances on-chain, live counter).
+Cross-cutting judge axes: **privacy-first** (the book is Canton-enforced
+need-to-know), **institutional-grade** (Daml authorization-first roles),
+**oracle-anchored** (`PriceFeed` marks + `RateFeed` funding), **honesty**
+(realized yield only — no phantom NAV; regime range stated, today's compressed
+regime shown at the bottom of it), **provenance** (the mechanism is a live
+production system, not a hackathon sketch).
 
 ---
 
-## 1. The end-to-end workflow & economic flows
+## 1. The mechanism & the end-to-end workflow
 
-**The yield.** Vault capital is allocated across Canton-native low-risk RWA yield
-sources — **tokenized-Treasury repo** carry and **tokenized MMF** base yield — by a
-rules-based, regime-aware allocator (rank by risk-adjusted yield, per-source cap to
-diversify, cash buffer for redemptions, yield floor). This is the institutional
-yield Canton is built for: ~T-bill/repo returns, capital-preserving, auditable.
+**The yield.** Perp longs pay funding (~hourly on Hyperliquid) to hold leveraged
+positions — a structural rent, averaging **~14%/yr on BTC and ETH over the 3.2y
+of HL's existence**. The vault shorts the perp to *collect* that rent and holds
+equal-notional cBTC/cETH on Canton so price moves cancel. Perp leverage is set
+by a liquidation buffer (L ≤ 1/(maint+move) → 5×), so **83% of deployed capital
+earns** (spot 1× + margin 1/L). When trailing funding decays below the exit
+floor, the **sign guard unwinds both legs** — the short never pays through a
+negative regime.
 
 **The on-chain workflow (the deliverable):**
-1. **create** — investor deposits → `Vault` mints `ShareHolding` at NAV/share. The
-   **manager** (off-chain allocator) reads oracle rates and **proposes** an
-   `AllocationPlan`; the **operator** approves it at the rate feed →
-   `Allocation` (authorization-first: the manager can't move funds).
-2. **update status** — `Vault_AccrueAllocation` marks the *realized* yield earned
-   at the oracle rate to NAV (repeatable as time passes / rates update).
-3. **fulfill** — `Vault_CloseAllocation` returns the capital to idle NAV; investors
+1. **create** — investor deposits USDCx → `Vault` mints `ShareHolding` at
+   NAV/share. The **manager** (the strategy engine reading HL funding) proposes
+   a `RebalancePlan` (short Hyperliquid / long Cantex, USDCx margin); the
+   **operator** approves at the oracle `PriceFeed` → `DeltaNeutralPosition`
+   with both `VenueLeg`s (net-delta ≈ 0 asserted on-chain).
+2. **update status** — `Vault_AccrueFunding` marks the *realized* funding
+   received at the oracle `RateFeed` to NAV (repeatable; no phantom yield).
+3. **transfer** — holdings move peer-to-peer: propose → accept → operator
+   settles; only the two holders, operator and auditor ever see it.
+4. **fulfill** — `Vault_UnwindPosition` closes both legs (sign guard); investors
    redeem at the higher NAV/share.
-4. **audit/report** — the **auditor** observes the vault and every allocation +
-   accrued yield throughout; a report is a query of the auditor's view.
+5. **audit/report** — the **auditor** observes the vault, every position, leg,
+   feed and holding throughout; a report is a query of the auditor's view.
 
-**Who pays / who earns.**
-- *Investors (holders)* earn capital-preserving RWA yield (repo/MMF ~4–5%/yr),
-  net of fee, with per-counterparty privacy.
-- *Operator/protocol* takes a management + performance fee on **realized** NAV
-  growth only.
-- *The yield is real cash flow* from the underlying RWA (repo interest, MMF
-  distributions), marked to an oracle `RateFeed` — never an emission or a guess.
+## 2. Proof — honest backtest on the real venue's data
 
-**No phantom yield.** `Allocation.accrued` only ever increases by
-`principal × oracle_rate × elapsed` — observed, realized, on-chain. Direct answer
-to Quantstamp/VC scrutiny.
+The production entry/exit rules replayed over **every hourly funding print
+Hyperliquid has paid for BTC and ETH (3.2 years, 27,427 prints each)** —
+non-lookahead (decide on the trailing 3-day window, accrue the next print),
+both-legs costs on every open/unwind, sign-guarded, realized funding only:
 
-## 2. Proof — honest backtest on real rates
+| | APY | Max drawdown | Deployed | Round trips |
+|---|---|---|---|---|
+| **cBTC sleeve** | 12.33% | — | 84% of hours | 28 |
+| **cETH sleeve** | 12.11% | — | 81% of hours | 36 |
+| **Blended vault (hero)** | **12.22%** | **0.21%** | — | — |
 
-Allocator replayed over **3y of real SOFR (repo) + 3M T-bill (MMF)** — a
-transparent public proxy for Canton's tokenized-RWA yields (non-lookahead, real
-turnover costs, idle cash earns 0, realized yield only):
+Rolling-1y range **4.7% / 11.7% / 22.6%** (min/median/max); **today's trailing
+1y ≈ 4.7%** — the current compressed-funding regime is the bottom of the range
+and we say so. Next-phase projection (RWA-margin stacking, 5y of BTC funding +
+FRED rates): blended 8.7% APY with a ~5% collateral floor.
 
-| Strategy | APY | Max drawdown | Deployed |
-|---|---|---|---|
-| **RWA repo + MMF (hero)** | **4.45%** | **0.00%** | 94% |
-| Basis / delta-neutral (secondary) | 3.95% | 0.07% | 63% |
+Reproduce: `python scripts/fetch_hl_funding.py && python -m basisvault_engine.backtest`.
 
-Reproduce: `python -m basisvault_engine.backtest`. The result feeds the dashboard's
-auditable "backtest band."
+## 3. Business brief — see [`BUSINESS_BRIEF.md`](BUSINESS_BRIEF.md)
 
-## 3. Business brief (1 page)
-
-**ICP — primary:** **regulated institutions, funds, and DAO treasuries** that want
-on-chain RWA yield (tokenized Treasuries/repo/MMF) they can **audit and keep
-confidential** — auditor sees everything, counterparties see nothing. Secondary:
-crypto-native treasuries seeking capital-preserving, market-neutral on-chain yield.
-
-**Use case:** park idle cash/stablecoins into a tokenized-Treasury/MMF vault; earn
-auditable repo/MMF carry; redeem at NAV; give your auditor a full real-time view
-without exposing positions to counterparties.
-
-**Why Canton (not an EVM L2):**
-- **Privacy by construction** — positions counterparty-private; auditor full view.
-  No public mempool leaking the book. Not cleanly possible on a transparent L2.
-- **Authorization-first Daml** — custodian/manager/auditor/holder roles enforced by
-  the ledger; a real fund structure, not bolted-on access control.
-- **RWA-native** — Canton is where tokenized Treasuries, repo, and MMFs are being
-  issued with atomic settlement; the yield sources live on the same network.
-
-**Who pays:** institutions pay a management/performance fee on realized yield; the
-app also earns Canton network rewards for the on-chain volume it generates.
-
-## 4. Pilot plan (2–3 steps + integrations)
-
-1. **Testnet pilot** — deploy the vault + allocation workflow; onboard 1–2 friendly
-   fund/DAO treasuries with their own auditor party; prove auditable yield +
-   privacy. *Integrations:* JSON Ledger API + party allocation; a tokenized-RWA
-   asset (or mock) + an oracle `RateFeed` (Chainlink).
-2. **Real RWA sources** — swap the mock `Allocation` seam for live tokenized-Treasury
-   repo / MMF tokens as they ship on Canton. *Integrations:* the RWA issuer's Daml
-   package + rate feed.
-3. **Scale** — enable fees; publish live NAV + the honest backtest; offer the vault
-   as a reusable Daml yield primitive other Canton apps compose against.
+## 4. Pilot plan — see [`PILOT_PLAN.md`](PILOT_PLAN.md)
 
 ## 5. Demo script (≈3 min, Grand Final)
 
-1. **Deposit** — investor deposits → `Vault` mints shares (institutional onboarding).
-2. **Allocate (create)** — allocator sees repo/MMF rates → manager proposes an
-   `AllocationPlan`; operator approves at the oracle `RateFeed`.
-3. **Accrue (update status)** — `Vault_AccrueAllocation` marks realized yield → NAV
-   rises. Show it's `principal × rate × time`, nothing invented.
-4. **Privacy wow-moment** — flip the dashboard role: **auditor sees the full RWA
-   book + backtest**, **holder sees only their holding + headline yield**,
-   **outsider sees nothing.**
-5. **Auditable yield** — the backtest band (4.45% APY @ 0% maxDD on real rates) +
-   the live **network-activity counter** (→ Canton rewards).
-6. **Fulfill** — `Vault_CloseAllocation` returns capital; redeem at higher NAV.
+1. **The pitch** (20s) — "Leveraged traders pay rent every hour. This vault
+   collects it: short the HL perp, long cBTC/cETH on Canton, price cancels,
+   funding remains. It's the live basisyield.com mechanism with the spot leg in
+   Canton custody."
+2. **Deposit** — Alice deposits $1M USDCx → shares minted at NAV (real tx id on
+   screen).
+3. **Open carry (create)** — manager proposes both pairs at live HL marks;
+   operator approves at the oracle feed; net-delta guard on-chain.
+4. **Accrue (update status)** — a quarter of real trailing funding accrues:
+   NAV/share rises; show it's notional × oracle rate × time, nothing invented.
+5. **Privacy wow-moment** — flip roles: **observer sees the whole book (ledger
+   says N contracts), holder sees only their holding, outsider sees zero** —
+   and point out the counts come from Canton's ACS, not the UI.
+6. **Transfer + sign-guard unwind + redeem (fulfill)** — holding moves
+   Alice→Bob; guard unwinds both legs; Bob redeems at the higher NAV.
+7. **Honest numbers** (20s) — 3.2y of real HL funding: 12.2% APY, 0.21% maxDD,
+   range 4.7–22.6%, today ~4.7%. Next phase: DBS gold + T-bill margin stacks
+   ~5% on top — margin that earns is the edge no crypto venue has.
 
 ## 6. Deliverable checklist
 
-- [x] MVP — end-to-end RWA allocation workflow in Daml (create/accrue/close/audit), green
-- [x] Roles UI — dashboard operator/holder/observer views with privacy filter
-- [x] Business brief — §3 (ICP, use case, who pays, why Canton)
-- [x] Pilot plan — §4
-- [x] Privacy demonstration — `testPrivacy` + `testAllocation` (holder can't see the book)
-- [x] Honest backtest on **real RWA rates** — 4.45% APY @ 0% maxDD (3y SOFR+T-bill)
-- [x] Network-activity counter on the dashboard
+- [x] MVP — end-to-end carry workflow in Daml (open/accrue/transfer/unwind/redeem/audit), 7 scripts green
+- [x] Roles UI — lifecycle panel + privacy book, ledger-enforced per-role ACS counts
+- [x] Real-ledger execution — sandbox + JSON Ledger API v2, real tx ids in the UI
+- [x] Business brief — `BUSINESS_BRIEF.md`
+- [x] Pilot plan — `PILOT_PLAN.md`
+- [x] Honest backtest on **real Hyperliquid funding** — 12.2% APY @ 0.21% maxDD (3.2y, both assets)
+- [x] Next-phase stacking backtest (RWA margin) — 8.7% APY projection, labelled as projection
 - [x] Demo script — §5
 - [ ] **Submission video / writeup** per the final submission form (format TBC)
-- [ ] *(onboarding)* real tokenized-RWA assets + rate feeds; testnet deploy; swap mock seams
-- [ ] *(stretch)* tokenized credit source; deeper Investment-Infrastructure framing
+- [ ] *(onboarding)* real testnet cBTC/cETH holdings via CIP-56 + BitSafe testnet; swap sandbox → testnet participant
 
 ## 7. Risks / honesty notes
 
-- **Mock seams** for the RWA assets, venue legs, and live ledger client until
-  Canton's tokenized-RWA rails + program onboarding (Delivery phase, Jul 4+) provide
-  real Daml interfaces + testnet creds. Stated plainly; the architecture is built so
-  the real pieces drop in unchanged.
-- **Building for Canton's trajectory, not only today** — tokenized-RWA yield is
-  Canton's stated flagship; some sources aren't live yet. We model them behind the
-  same seam so BasisVault is ready as they ship.
-- **Backtest uses BTC funding / TradFi rates as proxies** for CBTC basis and Canton
-  RWA yields (clean Canton history isn't public yet) — labelled as such; it
-  validates the *strategy + workflow*, and understates (no basis term, fees modest).
+- **The short leg is off-Canton** (Hyperliquid) — executed by the operator's
+  trade-only agent key and attested on-ledger as a `VenueLeg`. That is also how
+  the production system works; a fully-on-Canton pair waits for a mature Canton
+  perp venue (Canborsa is in beta).
+- **Venue execution is mocked in the demo** — the Canton ledger, the workflow,
+  the privacy and the funding data are real; HL order placement is not armed
+  (the production execution stack exists but stays out of a hackathon demo).
+- **Funding is regime-dependent** — the range (4.7–22.6% rolling-1y) is the
+  honest statement; today sits at the bottom. The sign guard means compressed
+  funding degrades toward 0%, not negative.
+- **cETH integration is access-gated** (OnRails contact flow) — pilot step 1
+  starts with cBTC (public testnet guide + SDK) and adds cETH on access.
