@@ -470,7 +470,7 @@ function renderLC(s){
   }).join('');
   const m=s.state, lg=s.ledger||{};
   const ledgerPill=lg.live
-    ?`<div class="m"><div class="v" style="color:var(--canton);font-size:15px">⛓ live Canton ledger</div><div class="l">${lg.visibleContracts??0} contract(s) visible to this role — enforced by the ledger, not the UI</div></div>`
+    ?`<div class="m"><div class="v" style="color:var(--canton);font-size:15px">⛓ live Canton ledger</div><div class="l">${lg.visibleContracts??0} contract(s) visible to this role — enforced by the ledger, not the UI · ${lg.participant||''}</div></div>`
     :`<div class="m"><div class="v" style="color:var(--faint);font-size:15px">mock driver</div><div class="l">sandbox offline — same workflow, simulated</div></div>`;
   $('#lc-strip').innerHTML=[
     ['Vault AUM',fmtUsd(m.aumUsd)],['NAV / share',m.navPerShare.toFixed(4)],

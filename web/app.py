@@ -450,7 +450,7 @@ def _lc_ledger_info(role: str) -> dict:
     try:
         n = len(BRIDGE.acs(LC_ROLE_PARTY[role]))
         return {"live": True, "visibleContracts": n,
-                "participant": "canton sandbox · JSON Ledger API v2"}
+                "participant": BRIDGE.label}
     except Exception:
         return {"live": False}
 

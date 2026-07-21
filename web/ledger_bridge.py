@@ -12,6 +12,7 @@ If the sandbox is unreachable the web app falls back to its mock driver.
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from typing import Any
 
@@ -21,7 +22,23 @@ log = logging.getLogger("basisvault.ledger")
 
 PKG = "#basisvault"
 HINTS = ("operator", "manager", "auditor", "oracle", "alice", "bob", "mallory")
-USER = "basisyield"
+
+# Point the bridge at any participant's JSON Ledger API v2 — the local sandbox
+# by default, a Canton DevNet/TestNet validator participant via env:
+#   LEDGER_API_BASE   e.g. http://127.0.0.1:7575 (sandbox) or the validator's
+#                     json-api endpoint
+#   LEDGER_API_TOKEN  bearer JWT if the participant requires auth (testnet does;
+#                     the sandbox doesn't)
+#   LEDGER_API_HOST   Host header override — the Splice compose validator routes
+#                     everything through one nginx on :80 by virtual host, so a
+#                     validator deployment needs "json-ledger-api.localhost"
+#   LEDGER_USER_ID    ledger user the app acts through (default "basisyield")
+#   LEDGER_LABEL      participant label shown in the UI proof block
+BASE = os.environ.get("LEDGER_API_BASE", "http://127.0.0.1:7575")
+TOKEN = os.environ.get("LEDGER_API_TOKEN", "")
+HOST = os.environ.get("LEDGER_API_HOST", "")
+USER = os.environ.get("LEDGER_USER_ID", "basisyield")
+LABEL = os.environ.get("LEDGER_LABEL", "canton sandbox · JSON Ledger API v2")
 
 # template short-name -> archiving authority (signatory), for reset()
 _ARCHIVE_AS = {
@@ -37,8 +54,13 @@ def _tpl(entity: str, module: str = "BasisVault.Vault") -> str:
 
 
 class LedgerBridge:
-    def __init__(self, base: str = "http://127.0.0.1:7575") -> None:
-        self._http = httpx.Client(base_url=base, timeout=25.0)
+    def __init__(self, base: str | None = None) -> None:
+        headers = {"Authorization": f"Bearer {TOKEN}"} if TOKEN else {}
+        if HOST:
+            headers["Host"] = HOST
+        self._http = httpx.Client(base_url=base or BASE, timeout=25.0,
+                                  headers=headers)
+        self.label = LABEL
         self.party: dict[str, str] = {}
         self._ready = False
 
@@ -163,6 +185,14 @@ class LedgerBridge:
         return self.submit(acts, [{"ExerciseCommand": {
             "templateId": _tpl(entity, module), "contractId": cid,
             "choice": choice, "choiceArgument": arg or {}}}])
+
+    def upload_dar(self, path: str) -> None:
+        """Upload the app DAR to the participant (idempotent — re-uploading the
+        same package is a no-op). Needed once per fresh participant/testnet."""
+        with open(path, "rb") as f:
+            r = self._http.post("/v2/packages", content=f.read(),
+                                headers={"Content-Type": "application/octet-stream"})
+        r.raise_for_status()
 
     # ---------- lifecycle helpers ----------
     def create_vault(self) -> dict:
