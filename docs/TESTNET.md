@@ -23,6 +23,37 @@ practice, **DevNet** (open to any node). Capital-T TestNet is a later milestone.
 
 ---
 
+## Track 0 — THE FAST PATH: NODERS' shared hackathon DevNet node
+
+From the NODERS "Canton Node + NaaS Workshop" (Jul 7 stream, transcript on
+file): the organizers run a **dedicated DevNet validator for HackCanton teams**
+— no VM, no IP allowlist, no wait. Kirill (NODERS DevOps) explicitly called
+self-hosting "100% not suitable for hackathon case."
+
+1. Log into **appsfactory.cc** with the team's hackathon account → hackathon
+   page → **Materials tab → "DevNet node materials"** (bottom). It lists the
+   wallet UI, CNS UI, all API endpoints (gRPC is "the main address"; check for
+   the JSON Ledger API too), a Grafana link with live node logs, and the
+   auth-token instructions.
+2. **Get a party ("Canton address"):** open the wallet UI, sign in with the
+   AppsFactory credentials, click **"Onboard yourself"** (one-time). Party ID
+   prefix = your platform user ID. The wallet also has tabs to request DevNet
+   tokens (faucet), featured-app rights, and transfer pre-approval.
+3. **API JWT:** POST your AppsFactory username/password per their instructions
+   → `Authorization: Bearer <jwt>` on ledger-API calls
+   (`LEDGER_API_TOKEN` in our bridge).
+4. **DAR upload is NOT self-service:** test on local sandbox first, then **tag
+   Kirill / the NODERS team in the HackCanton Telegram** with the DAR file —
+   they upload it quickly (controlled flow, needs admin).
+5. Open questions to ask when handing over the DAR: can our JWT allocate
+   additional parties (we need operator/manager/auditor/oracle/alice/bob/
+   mallory for the role demo, or a scoped-down variant), and is the JSON
+   Ledger API v2 exposed alongside gRPC (our bridge speaks JSON).
+
+If the shared node only grants one party per account, fallback framing: deploy
+the DAR + run the vault from our party on DevNet (real network, real txs) and
+keep the multi-party privacy demo on the sandbox side-by-side.
+
 ## Track A — today: ask the organizers (10 minutes)
 
 The 2–7-day IP allowlist is the only hard blocker, and NODERS (host) runs an SV

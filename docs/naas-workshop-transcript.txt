@@ -1,0 +1,732 @@
+Hello, hello, hello everyone. Hey
+hackers.
+Hello, welcome back. We are on day four
+of hack content season two and things
+are already moving. Quick update on
+where we stand. So, we have 239
+registered participants from 63
+countries.
+17 teams are actively building right
+now. Five projects are already live on
+the platform. Go check them out. A quick
+reminder before we dive in,
+make your project public. You don't need
+a finished product. A clear problem and
+direction is enough. Mentors are live
+on the platform. If your project isn't
+visible, they can't help you.
+Tweet your progress.
+Tag AppsFactory_CC.
+We repost everything. Fill your journal
+everyday.
+Judges see
+the full trajectory, not just the final
+submission.
+So, 17 days left until the deadline.
+Everyday counts.
+And now
+And now,
+today's session, Kirill is senior dev
+ops engineer at Nodders.
+There you go.
+He's a person who actually runs Canton
+in production day-to-day, not in theory,
+in production.
+Today he'll
+walk you through everything you need to
+know to get started on Canton.
+Party provisioning, API access, TAR
+deployment, node logs for debugging, and
+how to decide whether you need your own
+node or whether managed NAS makes more
+sense for that you're building.
+Drop your questions in the chat they
+come up. He'll take them between
+sections.
+So, Kirill, stage is yours.
+>> Yeah, thank you. Thank you, Alex.
+Hope you can hear me well. Hi, everyone.
+Hi builders.
+And let's just get moving with the
+Canton nodes
+workshop.
+So, why why do you need this workshop?
+>> Sorry, Kirill. I need to stop the the
+stream because we have lost
+Yeah.
+Your voice.
+Yeah, let's try the live.
+All right.
+Yeah, good to hear you sounding.
+>> Yeah.
+Got disconnected from my microphone.
+>> All right. So, we're asking for start
+from from the from the second slide.
+>> Uh yeah. Yeah, I'll just start over.
+So, why why do we need this workshop as
+a hacker or participant?
+So, here you hopefully will understand
+all the Canton nodes basics.
+We'll get familiar with the node types,
+how to access the
+node over the network,
+provision the party, how to work with
+API. We'll get some um
+live demo on Um, how to deploy and
+interact with the node, and yeah, how to
+run a debugging.
+So, there are
+um
+few different general ways how to
+approach the
+developing and deploying on the Canton.
+First of all, uh
+is the local sandbox or local net.
+Uh second one is the shared Canton
+node shared environment, uh which uh
+we're providing.
+Um another is the self-managed node,
+like your own node you run on premise
+and get a full control and uh
+possession of.
+And
+full NAS node as a service is when
+somebody runs a node for you and just
+you get all the benefits without a
+headache on how to manage it and operate
+it.
+So, let's talk a bit more detail about
+each each of those approaches.
+Easiest one which we are um
+willing everyone to try
+is the local sandbox.
+So,
+here on the QR you'll find a link to the
+documentation official Canton
+documentation on how to run the sandbox.
+Go ahead and
+try to start it. It is very simple.
+Uh
+You could get it running like
+with a few commands really. You'll only
+need a Docker uh to get it running.
+Uh it will get you a full set of
+Canton network
+including the super super validator,
+synchronizer, uh normal validator, and
+the all the UI wallets and and stuff
+which is could be imaginable within the
+Canton ecosystem.
+It will allow you to build and test your
+basic flows,
+your DAR files locally before moving to
+the devnet node.
+And
+yeah, as I mentioned, it will get you
+the whole stack so you'll get
+an ability to understand
+um
+uh to understand how everything
+functions besides the validator.
+Uh
+so, in case if you want to get your own
+node,
+uh as the one you will will have and the
+one you will run.
+Uh
+here's the link under the QR code link
+to the application form
+uh
+from the Canton Foundation.
+Uh you can submit an application,
+but there's a few caveats in this
+process.
+Um there's some uncertain wait time to
+get approved.
+Um
+I can't tell you but it could be like
+something from a few weeks up to a few
+months
+or even more.
+Um then you'll have to whitelist your
+IPs uh
+before you'll
+um be able to connect to the any of the
+networks like devnet, testnet, or
+mainnet.
+Uh later you'll have to
+um
+get a sponsor, find a sponsor, and
+onboard
+uh your nodes uh
+with a sponsor
+secret.
+Uh and
+until even until that stage you won't
+get to the mainnet.
+>> [clears throat]
+>> Excuse me.
+Um
+so yeah, the mainnet spots are a
+separate thing.
+Uh after all those steps, you'll still
+have to wait for a mainnet spot
+uh to be allocated for you.
+And only
+when that happens, uh you would be able
+to onboard and run in production on
+mainnet.
+So, not very not very easy, not very
+fast. Um
+Yeah, you just have to keep that in
+mind.
+Uh
+when going with own node, uh you either
+should be
+considering running it with a Docker or
+Kubernetes. Um here on this slide, I
+have the cons and pros for both
+um
+ways.
+Uh for Docker, you definitely
+uh
+should be able to deploy faster. It is
+much more simpler and cost-effective.
+But, it has uh some limitations uh with
+the scaling. It a bit more It is a bit
+less flexible, and it just uh not being
+considered as the default uh standard
+approach to to run the node in
+ecosystem.
+While mm
+but it is fully supported, though.
+Um had to mention that. Uh
+Uh and versus the Kubernetes deployment,
+um you will get fully flexible in terms
+of uh configuration,
+uh in terms of um
+scaling.
+It is considered as the common
+uh as the common way to run the node in
+Canton.
+Therefore, you will get the better uh
+support
+from the apps. All the guys will be
+first for Kubernetes, secondly for
+um Docker. But,
+um with all those pros, it is much more
+complex and costly to run the knowledge
+incubator.
+So, yeah, that sound a bit complicated.
+Probably.
+Uh so, things you have to consider
+um with your own node path.
+Uh firstly, uncertain time to you get
+running.
+Uh second is spending time and effort to
+support and deploy and run the
+infrastructure
+instead of deploying your own
+application or slack.
+Spending that time on the development of
+the application logic.
+And it is
+100% not suitable for hackathon case.
+So, what what can we
+um
+give you as a solution to get running on
+the
+on the hackathon.
+Uh so, we prepared a dedicated
+environment for all the participants.
+It will get you fast
+fastly deployed and onboarded to your
+devnet.
+You will not have to mess with the
+infrastructure.
+Uh
+and just um
+will be just able to uh access all that
+we deployed right away.
+And you'll just have a more time, of
+course, to focus
+>> Hey, girl.
+Once again, you have a trouble with a
+with your mic.
+That was fine.
+>> Okay. Um my headphones keep
+disconnecting for some reason.
+Uh so, where did I cut?
+>> Uh, it's 10 seconds before.
+>> Uh-huh. Okay. So, yeah, just basically
+uh all the pros uh without a headache uh
+to get
+uh something deployed on our shared
+infrastructure rather than setting up
+something
+yourself.
+So, uh we have a devnet node uh set up
+specifically for a hackathon for our
+hackathon,
+which you would be able to access with
+your House Factory account. The same one
+you're using to log into the platform to
+House Factory.
+Um
+you would be able to get a party uh on
+live devnet,
+uh access the API of the node right
+away,
+upload the DAR.
+Uh though, I just have to mention that
+it will go through a controlled uh
+upload flow.
+Uh
+later you would be able to access the
+node logs for debugging purposes and uh
+get yourself uh
+the tokens on the devnet and feature app
+status if needed to test all the
+mechanics related to it.
+So, uh practical development flow uh
+will include um
+obtaining a party in devnet,
+uh
+querying the API, deploying a DAR, uh
+that will
+that will
+require some help from our side cuz um
+uh
+DAR deployment is the um
+is the operation which require the admin
+access, so we obviously cannot
+offer that to you everybody uh to keep
+the things right.
+Uh
+and but uh without a
+without a doubt, we would be able to
+help you get it like deployed very fast,
+and you would be able to run your
+workflows and test um integrations
+and check the log and debug properly.
+Uh so, few words regarding the DAR
+upload. Um
+if you will have your First First of
+all, I will
+like personally recommend you to um
+set up to launch the local sandbox to
+check your DAR regarding it.
+So, you at least would be able that it
+is compiled correctly according the
+correct version and could be uploaded.
+When you have your DAR
+ready, you can tag me in the Hackathon
+chat in Telegram.
+Um so, hand over this DAR file, and I
+will get it uploaded.
+Or if I will not be available for some
+reason, just tag anyone from the team
+and we'll get to running.
+Uh
+and
+later you would be able to access all
+the
+calls your DAR is planning to the to the
+node execute the contracts
+uh
+and
+during those
+that execution, you If you'll get any
+error messages,
+you would be able to access the logs as
+well to
+find the reason of what is going wrong
+not very correct and what are you
+probably misusing.
+Okay. So, now Alex, can you please
+please switch over to
+my screen?
+So, I will get a quick demo
+of how to interact with the API API
+onboard yourself and
+basically all the I just mentioned
+about. So, first of all, uh, go to our
+hackathon page, uh, and on the materials
+tab,
+like somewhere closer to the bottom of
+the page, you'll have the DevNet node
+materials.
+Uh, that is what you will need to, um,
+access the node. Here you'll have links
+to the wallet, to the CNS, those are the
+web UIs provided uh, running with the
+node.
+Uh, get all the API endpoints,
+uh, find the link to the log, and get
+some details about how to query the
+um, the node, uh, and how to obtain the
+authentication tokens.
+So, uh, let me
+go ahead. This is the wallet.
+Um,
+here you would be able to sign in using
+your um
+Alt Factory account. So, that is
+basically the account you're using for,
+uh, platform access, for filling
+journals, and etc.
+Let me just, uh, sign in real quick.
+After the sign-in, normally you should,
+uh, not see that window, but, uh, should
+be should see the like big blue button
+saying onboard yourself.
+So, you should definitely go ahead and
+click that button. I already did that,
+and this is irreversible, uh, so,
+so, sorry, I cannot showcase that.
+But, uh, that basically after
+onboarding, you will get the party
+party ID. Uh, it is located up here, you
+would be able to copy
+So, that will be your party ID on the
+DevNet.
+Um, you would be able to, uh, request
+some testnet tokens, uh,
+using this tab.
+Um
+Yeah, it it just take few seconds to
+proceed. Um
+Keep that in mind. Also, here you'll be
+able to grant yourself um
+self
+uh feature uprights
+or uh pre-approve incoming direct
+transfers of the Canton coin for
+whatever the mechanics you might need.
+Also, all the things uh with the
+transfers and basically the standard um
+standard wallet UI from the from the
+Canton that runs with the node, you'll
+be able to get it.
+Uh
+later uh the link to uh logs um
+is this one.
+It basically contain all the uh live
+node logs.
+Uh
+Yeah, it just uh
+refreshing once in a while and you'll be
+able to use them for
+uh checking out what's going on if
+you're getting like doing some call to
+the node and getting some error, you'll
+be able to grab the error ID and search
+here
+to find what exactly went wrong.
+Um now, let me switch over to my console
+and I will showcase how to access the
+how to access the
+API over the CLI or whatever. So, first
+of all, you will need to obtain the uh
+JWT token
+for authorization.
+Uh you'll have to grab uh this request,
+fill up with your
+uh username and password you're using in
+the
+uh house factory
+or for logging here, all the same
+credentials.
+Then, go ahead to
+to the console and execute this request
+in
+As a result, you will get the
+uh JSON with the token. Uh I'll do that
+in the background. I'll just um import
+the GVT.
+So, I'm not sharing my credentials. So,
+basically, you'll get the JSON with a
+GVT and bunch of
+bunch of other uh stuff there. You'll
+get that uh thing called access token.
+Um
+And later, uh using the
+address from the
+let's say the gRPC, probably the main
+address you will need.
+So, using the this address, you should
+be able to execute
+some requests.
+So, for example, uh I currently exported
+my GVT as the variable here.
+Uh
+and passing this uh
+GVT as authentication bearer, I I'm able
+to uh request
+uh
+some
+some call to do do a call to user right
+list for user ID. This is my user ID
+uh which I got from the
+wallet.
+Here.
+It's part of
+first half of your party.
+So, getting this uh request I'll pardon
+me.
+I'll have to authenticate.
+I'll do that once more time.
+Okay. So, my request went through. Now,
+it's
+that I'm able to can act like act as the
+party and this is my party I have in
+wallet.
+Same one.
+So, for example, if you'll try to do um
+Oh, not try, but we'll probably do
+something wrong. Let's say I'm I'm I
+will uh
+try to request the
+um
+user rights for another user, which is
+not me and which is I'm not authorized
+to
+um
+to know about.
+So, I will get some sort of error with
+permission issues.
+And most importantly, I will get these
+uh TID
+or error ID, whatever.
+Uh so, having that uh kind of request uh
+to get like what exactly is went wrong,
+you will need to grab that ID and went
+to the uh to this Grafana
+and just search
+for it.
+And here you'll definitely find uh a
+logs uh which will explain you more
+about
+what exactly
+is went wrong with your request.
+Of course, here I'm just I'm just having
+the simple uh permission uh error, so
+I'm not just I'm just not able to uh do
+a request on behalf of this user.
+Uh but in case uh if you'll have uh more
+complicated
+uh or something related to a contracts
+or execution of whatever stuff, uh
+you'll definitely get a full explanation
+of what went wrong here.
+Um
+Okay, that's probably it uh regarding
+the flow of the API access.
+Uh Uh, you can uh find
+all the links to your documentation of
+the API in the materials on the
+on the hackathon page.
+And let's just switch over to
+to the presentation.
+All right. Thank you, Alice.
+So um
+we covered the local sandbox,
+shared node, and own node part.
+And the one
+which we are left for dessert is the
+node as a service.
+So, uh when
+node may be relevant for you.
+Uh,
+when you need more than a temporary
+hackathon access to the network.
+When you want to commit a long-term
+managed environment.
+When you need isolation and life cycle
+management and uh
+good support for uh for the node. And
+most importantly, when you don't want to
+care about the infrastructure yourself.
+So, uh here we willing to offer the node
+as a service, the Canton node as a
+service from from our from Noders.
+We are registered node as a service
+provider in the Canton.
+Um so, benefits which
+it will give you um
+above um
+what was mentioned before is we support
+the all the
+top-notch security features uh
+with a security key management with
+Google Cloud KMS. We have all the
+documented
+backup and disaster recovery procedures
+in place. Um we have good pricing for a
+capital uh hackathon participants. Um
+The node is
+100%
+watched and operated continuously.
+We have upgrade automated and all all in
+price managed through a GitHub
+and uh
+more importantly, we have the capital
+console, which is a handy dandy UI tool
+for the party creation, DAR upload,
+and node management
+in your browser
+while you have the node as a service
+from us.
+So uh
+as a wrap-up, let's just
+compare
+the approaches
+we learned
+here
+on the hackathon today.
+Uh so,
+what are benefits for each one? So,
+shared hackathon node
+is the fastest way to start in Devnet on
+a hackathon.
+Uh it is ideal Yeah, ideal for what it
+is for for hackathon.
+For hackers, for people who willing to
+hop on and
+try on something like instantly.
+Self-managed node
+on on node
+is gives you a maximum control, but
+comes comes with a huge effort um
+>> Okay, real.
+Yeah, probably this the last one.
+Can you hear me? Yeah, well, I you, but
+we can see you.
+>> All right, I guess I will probably have
+to um
+go on with uh with this way.
+>> All right.
+>> Cuz my my headphones just just died
+probably.
+Uh all right, so uh self-managed node
+will give you the maximum control, of
+course. Um
+Ooh.
+Uh
+but we it will come with a huge infra-
+first to run it.
+Uh
+and later full node as a service
+uh
+will get you all the best from above uh
+with uh no
+uh almost no caveats and no
+cons.
+Uh you'll get the long-term managed
+setup
+uh with minimum operational burden for
+yourself.
+So, yeah, consider that and thank you.
+Thank you all uh for listening. Uh if
+you'll have any question regarding the
+um
+interaction with our node uploading
+DARs, of course,
+um and whatever they come from the
+infrastructural side, or whatever node
+as a service
+requests, uh please hit me tag me in
+Telegram in Hacken Town channel, or
+shoot me a DM, and I'll get you all.
+Uh I'll get you help.
+All right, thank you all for um
+being here.
+>> all. Yeah, before go before I go, yeah,
+we have a few questions in the chat.
+>> Yeah.
+>> Can you cover it?
+>> Yeah, of course.
+>> one is uh
+for world integration via the the app is
+the key, the world gateway needs for the
+letter level access behind it.
+So, it probably the question is does the
+shared hackathon node support running a
+wallet gateway against it or is that
+only possible with self-management
+or mass?
+>> Uh yeah, we don't um
+definitely don't have a wallet gateway
+um running right away.
+Uh
+but probably if there if there um
+a a way to um
+connected over the API, but some like no
+tweaks or access tweaks required, we may
+try to set it up
+uh
+to running. So, yeah, if you you'll get
+you'll need that um just uh
+just let me know and we'll try to to get
+it running on the then as well.
+Are there any more uh question
+questions uh ask?
+>> No, no, that's that's that's only one.
+>> Oh, okay.
+So um
+fast today.
+>> Yeah, really fast. All right, thank you,
+Kirill. Thank you, Jenny Li.
+Uh this is the the kind of knowledge
+that's uh hard to find anywhere and it
+stays useful long after the hackathon
+ends.
+All right.
+Uh so,
+so if you are if you have questions that
+didn't get answered, drop them uh in the
+private Telegram group and Kirill and
+team are there to answer for it.
+So, quick reminder before before we uh
+end this stream,
+uh tweet what you're building, uh tag us
+uh
+on X and we'll amplify.
+Make your project public. Mentors can
+only help what they can see.
+Uh fill your journal
+uh a little every day. Claim your mana
+100 per day, 1,000 to submit. Don't fall
+behind and upload your documents.
+Pitch deck, repo, description. Start
+now.
+And tomorrow Genie workshop. If DML left
+like the barrier between you and
+Shipyard content, this session is for
+you.
+Satyam from Genie will show how to go
+from an idea
+to a working content DApp in one
+sitting.
+That's covered. What Genie is and how to
+help content builders.
+Turning workflow ideas into Damo smart
+contracts.
+Generating, compiling, and auditing and
+deploying contracts. Using the content
+DApp SDK to build a real front-end flow.
+Connect wallets, users, and content app
+logic.
+Building a complete DApp end-to-end.
+And live Q&A for Hack Canton season 2
+builders and hackers. So, yeah.
+Tomorrow, Wednesday, July 8th
+at
+12:00 UTC.
+You are always welcome, hackers.
+So, yeah. Link will drop soon Telegram
+30 minutes before. So,
+see you there.
+And now,
+go build and may block be with you.
+Bye. See you tomorrow.
