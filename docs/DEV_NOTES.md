@@ -90,3 +90,31 @@ funding-rate inputs to Canton funding/basis, reading vault state via the JSON
 Ledger API (e.g. DAZL). Copy **selectively and scrub** — do not bring proprietary
 trading/execution code (engine, exchange, relayer, killswitch, onboarding) into
 this repo.
+
+## Venue scan: Polymarket perps as an alternative short leg (2026-07-22)
+
+Polymarket launched perps (beta) 2026-04-21: BTC/ETH/SOL/HYPE crypto + GOLD,
+SILVER, WTI, SP500, NAS100, equities; hourly funding, 20× max leverage, public
+API (`api.perpetuals.polymarket.com/v1/info/*`). Investigated as a
+higher-yield short leg. **Verdict: not viable today — HL stays.**
+
+- **Yield, same 4.2-day window (all the public history their funding endpoint
+  serves, ~100 hourly prints):** PM BTC 7.78% / ETH 3.24% annualized vs
+  HL BTC 9.17% / ETH 11.09%. No edge.
+- **Instantaneous funding** often prints exactly the interest-leg default
+  (0.01%/8h ≈ 10.95%/yr) because the book is too thin for a premium: with
+  fewer than ~$1k of depth within ±0.5% of mid, their impact-price formula
+  falls back to the index and the premium term zeroes out.
+- **Capacity:** BTC OI ≈ $4.5M (HL: $2.4B — ~500×); BTC book depth ±0.5% ≈
+  $364 bid / $631 ask. Our demo notional alone ($400k/leg) exceeds the whole
+  book by ~1000×.
+- **Validation:** only ~4 days of funding history is publicly retrievable
+  (no pagination past 100 prints), venue is 3 months old — nothing to
+  backtest against honestly.
+
+**Keep on the watchlist for two reasons:** (1) multi-venue funding routing
+once PM OI grows (the engine's venue seam makes the short leg pluggable);
+(2) **PM lists a GOLD-USD perp** — the natural short leg for the next-phase
+DBS-gold-token carry (long tokenized gold on Canton, short XAU perp), which
+today has no on-Canton or HL-native equivalent. Same liquidity caveat
+(GOLD OI ≈ $880k) — revisit quarterly.
