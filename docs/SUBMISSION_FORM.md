@@ -11,7 +11,19 @@ phase, not our MVP).
 BasisYield
 ```
 
-## Elevator pitch (≤2000 chars)
+## Elevator pitch (one-liner, lands in 30s)
+
+```
+Leveraged traders pay rent every hour to hold their positions — BasisYield collects it. We short the BTC/ETH perp on Hyperliquid and hold cBTC/cETH in Canton custody, so price risk cancels and funding is all that remains: 12.2% APY backtested on 3.2 years of real Hyperliquid data, 0.21% max drawdown, every demo step a real Daml transaction. The auditor sees everything, counterparties see nothing — the live basisyield.com engine, brought on-chain.
+```
+
+Shorter alternate (~15s):
+
+```
+BasisYield turns the hourly funding leveraged traders pay into market-neutral, auditable yield on Canton — short the Hyperliquid perp, long cBTC/cETH in Canton custody. 12.2% APY on 3.2 years of real data, private by Canton, no phantom yield.
+```
+
+## Long-form description (if the form has a separate description/about field)
 
 ```
 BasisYield is a market-neutral yield vault on Canton that collects the "rent" leveraged traders pay: it shorts BTC/ETH perpetuals on Hyperliquid (earning the hourly funding longs pay) while holding cBTC/cETH in Canton custody — price risk cancels, funding is all that remains. It is the on-chain productization of our live basisyield.com engine.
