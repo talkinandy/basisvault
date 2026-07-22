@@ -185,11 +185,19 @@ integration is real.
 
 ## Who to chase, in order
 
-1. HackCanton Discord/Telegram — sponsor-SV fast-path or hosted participant
+1. **NODERS NaaS** — the hackathon host runs Node-as-a-Service (see their
+   "Canton Node + NaaS Workshop" video); a hosted validator skips the VM, the
+   compose deployment AND the IP-allowlist wait. Ask what a team gets: JSON
+   Ledger API access + DAR upload + party allocation is all we need
+   (the official deploy guidance is explicitly "self-host **or NaaS**").
+2. HackCanton Discord/Telegram — sponsor-SV fast-path or hosted participant
    (Track A message above).
-2. GSF channels — https://sync.global/validator-request/ (form is
-   MainNet-framed; DevNet asks go via your sponsor SV / GSF lists at
-   https://lists.sync.global/).
-3. BitSafe — separately ask for **cBTC testnet access** (their docs ship a
+3. **`#gsf-global-synchronizer-appdev`** on the Canton/GSF Slack — the
+   canonical channel for DevNet app-dev asks; also the GSF lists at
+   https://lists.sync.global/.
+4. BitSafe — separately ask for **cBTC testnet access** (their docs ship a
    testnet guide + `cbtc-lib`); real testnet cBTC holdings are pilot step 1 and
    would be a strong flex if it lands early.
+
+Current validator-compose docs (non-deprecated):
+https://docs.canton.network/sdks-tools/development-tools/validator-operator/docker-compose-validator.html
