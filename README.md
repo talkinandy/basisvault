@@ -14,8 +14,9 @@ only their own holding, and counterparties see nothing — which is what makes
 running a delta-neutral book on-chain viable at all (a public book gets traded
 against).
 
-Built for **HackCanton League — Season 2** (hosted by NODERS). Track: **Real-World
-Asset (RWA) & Business Workflows**. **Submission deadline: 2026-07-25 23:59 UTC** ·
+Built for **HackCanton League — Season 2** (hosted by NODERS). Track: **Financial
+Applications: DeFi, Exchanges & Prediction Markets** (real economic activity,
+liquidity flows, composability). **Submission deadline: 2026-07-25 23:59 UTC** ·
 Grand Final 2026-08-05. See [`docs/SUBMISSION.md`](docs/SUBMISSION.md) for the
 track-requirement map and demo script.
 

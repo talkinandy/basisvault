@@ -1,9 +1,23 @@
 # BasisVault — HackCanton Season 2 submission
 
-**Track:** Real-World Asset (RWA) & Business Workflows *(primary)* · Investment
-Infrastructure (fund structure) *(secondary framing)*
+**Track:** Financial Applications: DeFi, Exchanges & Prediction Markets
+*(switched from RWA & Business Workflows 2026-07-22 — the carry hero is a
+financial application; RWA is our next phase. Form pack: [`SUBMISSION_FORM.md`](SUBMISSION_FORM.md))*
 **Deadline:** 2026-07-25, 23:59 UTC · **Grand Final:** 2026-08-05, 14:00 UTC
 **Repo:** github.com/talkinandy/basisvault · **Live:** https://canton.basisyield.com
+
+**Track fit** — the track asks for financial applications demonstrating *real
+economic activity, liquidity flows, and composability across Canton-based
+infrastructure*:
+- **Real economic activity** — the demo executes real Daml transactions on a
+  Canton ledger (deposits, carry opens at live HL marks, funding accrual,
+  transfers, redemptions — real tx ids in the UI); the yield source is a real
+  structural flow (perp funding, ~14%/yr avg on 3.2y of HL data).
+- **Liquidity flows** — USDCx in → cBTC/cETH spot + HL perp margin → funding →
+  NAV → redemption; share transfers move claims peer-to-peer.
+- **Composability** — vault shares are transferable Daml holdings; the spot leg
+  targets CIP-56 `Holding`/`TransferInstruction`; the vault is a reusable
+  yield primitive other Canton apps can compose against.
 
 > **BasisYield on Canton** — a privacy-preserving, auditable **market-neutral
 > yield vault**. It runs the production [basisyield.com](https://basisyield.com)
@@ -15,7 +29,11 @@ Infrastructure (fund structure) *(secondary framing)*
 
 ---
 
-## Track requirements → what we deliver
+## Deliverables map
+
+Business-first deliverables (the S2 pattern: MVP + economic-flows explanation +
+network-activity demonstration + GTM/ICP). The table below was built to the RWA
+track's end-to-end-workflow bar — it only strengthens a FinApps entry:
 
 | Required | BasisVault delivers | Status |
 |---|---|---|
