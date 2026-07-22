@@ -112,9 +112,21 @@ higher-yield short leg. **Verdict: not viable today — HL stays.**
   (no pagination past 100 prints), venue is 3 months old — nothing to
   backtest against honestly.
 
-**Keep on the watchlist for two reasons:** (1) multi-venue funding routing
-once PM OI grows (the engine's venue seam makes the short leg pluggable);
-(2) **PM lists a GOLD-USD perp** — the natural short leg for the next-phase
-DBS-gold-token carry (long tokenized gold on Canton, short XAU perp), which
-today has no on-Canton or HL-native equivalent. Same liquidity caveat
-(GOLD OI ≈ $880k) — revisit quarterly.
+**Keep on the watchlist:** multi-venue funding routing once PM OI grows (the
+engine's venue seam makes the short leg pluggable). PM also lists a GOLD-USD
+perp, but same liquidity caveat (OI ≈ $880k).
+
+## Gold short leg: Hyperliquid already has it (2026-07-22)
+
+Correction to the above — the gold carry needs no new venue: **HL's `xyz`
+builder-dex runs a GOLD perp** (`xyz:GOLD`: OI ≈ $168M, 25× max leverage,
+funding ~11.6%/yr at scan time) and HL lists **XAUT0 spot** (the production
+fundingcarry repo already trades this pair). Full funding history fetched
+(5,082 hourly prints, Dec 2025 → Jul 2026, committed as
+`engine/data/hl_gold_funding.json`): **avg funding 8.86%/yr; the production
+carry rules backtest to 6.82% APY @ 0.16% maxDD** (82% deployed, 6 round
+trips — window is only 0.58y, so no rolling-1y range yet).
+
+Next-phase gold carry is therefore executable the day the DBS gold token
+ships on Canton: long tokenized gold in Canton custody, short `xyz:GOLD` on
+HL — the exact cBTC/cETH pattern, third asset.

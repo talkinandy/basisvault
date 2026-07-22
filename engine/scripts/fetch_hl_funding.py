@@ -21,7 +21,13 @@ import httpx
 
 URL = "https://api.hyperliquid.xyz/info"
 DATA = Path(__file__).resolve().parent.parent / "data"
-COINS = {"BTC": "hl_btc_funding.json", "ETH": "hl_eth_funding.json"}
+COINS = {
+    "BTC": "hl_btc_funding.json",
+    "ETH": "hl_eth_funding.json",
+    # next-phase gold pair: HIP-3 builder-dex perp (short) vs XAUT0 spot /
+    # DBS gold token on Canton (long). History starts 2025-12-22.
+    "xyz:GOLD": "hl_gold_funding.json",
+}
 
 
 def fetch(coin: str) -> list[dict]:

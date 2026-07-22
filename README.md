@@ -162,9 +162,12 @@ uvicorn web.app:app                          # localhost:8000
 CIP-56 + BitSafe `cbtc-lib`; two design-partner treasuries with their own
 auditor parties. **Pilot 2 (2–5 mo)** — arm the HL short with the production
 execution stack; collateral balancer between HL margin and Canton custody.
-**Next phase** — DBS gold token as the third carry pair (H2 2026); DTCC
-tokenized T-bills as **margin that earns while backing the carry** (Oct 2026);
-Canton-native perp venue when one matures. Details: [`docs/PILOT_PLAN.md`](docs/PILOT_PLAN.md).
+**Next phase** — DBS gold token as the third carry pair (H2 2026): the short
+leg already exists and is validated — HL's `xyz:GOLD` perp ($168M OI; 7 months
+of funding history committed, avg 8.9%/yr, carry backtest **6.8% APY @ 0.16%
+maxDD** with the same rules). DTCC tokenized T-bills as **margin that earns
+while backing the carry** (Oct 2026); Canton-native perp venue when one
+matures. Details: [`docs/PILOT_PLAN.md`](docs/PILOT_PLAN.md).
 
 ---
 
