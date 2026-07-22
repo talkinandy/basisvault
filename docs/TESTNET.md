@@ -232,3 +232,14 @@ integration is real.
 
 Current validator-compose docs (non-deprecated):
 https://docs.canton.network/sdks-tools/development-tools/validator-operator/docker-compose-validator.html
+
+**Ruled out (investigated 2026-07-22, don't re-chase):**
+- **Seaport (5North, devnet.seaport.to)** — cloud DAML IDE/deploy console, NOT a
+  hosted participant: its deploy flow requires a validator Ledger-API URL +
+  OIDC credentials you already have, and its REST proxy is not the JSON Ledger
+  API v2. Free guest mode works; only useful as an optional web UI (DAR upload,
+  party browsing) *on top of* the NODERS node if NODERS shares OIDC creds.
+- **Canton Hub (unityhub.dev/canton)** — link directory only; no faucet/node.
+- **FTP agent-wallet / x402 stack** — agent payments + faucet via a third-party
+  facilitator; parties live on the facilitator's node, not where our DAR is.
+- **Polymarket perps** as alternative short leg — see DEV_NOTES venue scan.
