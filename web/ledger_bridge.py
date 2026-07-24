@@ -39,6 +39,9 @@ TOKEN = os.environ.get("LEDGER_API_TOKEN", "")
 HOST = os.environ.get("LEDGER_API_HOST", "")
 USER = os.environ.get("LEDGER_USER_ID", "basisyield")
 LABEL = os.environ.get("LEDGER_LABEL", "canton sandbox · JSON Ledger API v2")
+# shared nodes allocate namespaced hints, e.g. "basisvault-operator" — set
+# LEDGER_PARTY_PREFIX=basisvault- to map them onto our role hints
+PREFIX = os.environ.get("LEDGER_PARTY_PREFIX", "")
 
 # OIDC auto-refresh (shared DevNet nodes front the ledger API with Keycloak;
 # access tokens live minutes, so a static LEDGER_API_TOKEN dies mid-demo).
@@ -134,23 +137,36 @@ class LedgerBridge:
             return False
 
     def _bootstrap(self) -> None:
-        existing = {p["party"].split("::")[0]: p["party"] for p in self._parties()}
+        try:
+            existing = {p["party"].split("::")[0]: p["party"] for p in self._parties()}
+        except Exception as e:
+            # shared node: the party directory is admin-gated — discover our
+            # parties from the rights the operator granted our user instead
+            log.warning("party listing unavailable (%s); using granted rights", e)
+            r = self._http.get(f"/v2/users/{USER}/rights")
+            r.raise_for_status()
+            existing = {}
+            for right in r.json().get("rights", []):
+                for kind in ("CanActAs", "CanReadAs"):
+                    p = right.get("kind", {}).get(kind, {}).get("value", {}).get("party")
+                    if p:
+                        existing[p.split("::")[0]] = p
         for h in HINTS:
-            if h not in existing:
+            if PREFIX + h not in existing:
                 r = self._http.post("/v2/parties", json={
-                    "partyIdHint": h, "identityProviderId": ""})
+                    "partyIdHint": PREFIX + h, "identityProviderId": ""})
                 if r.status_code in (401, 403):
                     # shared node: allocation is admin-gated — parties must be
                     # pre-allocated by the operator (see docs/TESTNET.md)
-                    log.warning("party allocation forbidden; missing hint %r", h)
+                    log.warning("party allocation forbidden; missing hint %r", PREFIX + h)
                     continue
                 r.raise_for_status()
-                existing[h] = r.json()["partyDetails"]["party"]
-        missing = [h for h in HINTS if h not in existing]
+                existing[PREFIX + h] = r.json()["partyDetails"]["party"]
+        missing = [h for h in HINTS if PREFIX + h not in existing]
         if missing:
             raise RuntimeError(
                 f"parties missing and not allocatable on this participant: {missing}")
-        self.party = {h: existing[h] for h in HINTS}
+        self.party = {h: existing[PREFIX + h] for h in HINTS}
 
         rights = ([{"kind": {"CanActAs": {"value": {"party": p}}}} for p in self.party.values()]
                   + [{"kind": {"CanReadAs": {"value": {"party": p}}}} for p in self.party.values()])

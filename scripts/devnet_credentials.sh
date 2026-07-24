@@ -78,10 +78,10 @@ with open(env_file, "w") as f:
     f.write(f"""LEDGER_API_BASE={os.environ['JSON_API']}
 LEDGER_OIDC_TOKEN_URL={token_url}
 LEDGER_OIDC_CLIENT_ID={os.environ['CLIENT_ID']}
-LEDGER_OIDC_SCOPE={os.environ['SCOPE']}
+LEDGER_OIDC_SCOPE="{os.environ['SCOPE']}"
 LEDGER_OIDC_REFRESH_TOKEN={refresh}
 LEDGER_USER_ID={sub}
-LEDGER_LABEL=Canton DevNet · NODERS hackcanton-01 · JSON Ledger API v2
+LEDGER_LABEL="Canton DevNet · NODERS hackcanton-01 · JSON Ledger API v2"
 """)
 print(f"→ wrote {env_file} (mode 600).")
 print("""

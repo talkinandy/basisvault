@@ -17,7 +17,7 @@
 1. **Open [canton.basisyield.com](https://canton.basisyield.com)** and scroll to
    **"Run it yourself."** Click **▶ Next step** six times: deposit → open carry →
    accrue funding → transfer → unwind → redeem. Every event shows a **real Daml
-   transaction id** — the demo executes against a live Canton ledger (JSON
+   transaction id** — the demo executes on **Canton DevNet** (the HackCanton shared validator, JSON
    Ledger API v2), and the carry pairs open at **live Hyperliquid marks**.
 2. **Flip the role tabs** (Observer / Issuer / Holder / Outsider). The
    "N contract(s) visible to this role" badge is **Canton's own per-party ACS
@@ -106,14 +106,14 @@ short is attested on-ledger as a `VenueLeg`; execution stays un-armed in a demo)
 
 | Component | Status |
 |---|---|
-| Canton ledger + all 6 lifecycle steps as Daml txs | ✅ **real** (sandbox participant, JSON Ledger API v2) |
+| Canton ledger + all 6 lifecycle steps as Daml txs | ✅ **real — Canton DevNet** (NODERS validator, JSON Ledger API v2) |
 | Per-role privacy (ACS counts in the UI) | ✅ **real, ledger-enforced** |
 | Funding dataset + backtest | ✅ **real** (HL's own prints, committed) |
 | Live BTC/ETH marks in the demo | ✅ **real** (HL API, 60s cache) |
 | Production engine provenance | ✅ **real** (basisyield.com, 24/7 paper) |
 | HL order execution | 🔶 mocked as on-ledger `VenueLeg` attestation |
 | cBTC/cETH as CIP-56 holdings | 🔶 modeled; pilot step 1 (BitSafe `cbtc-lib` + testnet) |
-| DevNet deployment | 🔶 bridge is env-ready; onboarding guide in [`docs/TESTNET.md`](docs/TESTNET.md) |
+| DevNet deployment | ✅ **live** — DAR on the HackCanton shared validator; 7 parties; the public demo runs on it |
 
 ## The end-to-end workflow (on-chain)
 
