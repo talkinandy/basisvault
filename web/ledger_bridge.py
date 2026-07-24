@@ -40,6 +40,54 @@ HOST = os.environ.get("LEDGER_API_HOST", "")
 USER = os.environ.get("LEDGER_USER_ID", "basisyield")
 LABEL = os.environ.get("LEDGER_LABEL", "canton sandbox · JSON Ledger API v2")
 
+# OIDC auto-refresh (shared DevNet nodes front the ledger API with Keycloak;
+# access tokens live minutes, so a static LEDGER_API_TOKEN dies mid-demo).
+# Set these and the bridge keeps itself authenticated:
+#   LEDGER_OIDC_TOKEN_URL      Keycloak token endpoint
+#   LEDGER_OIDC_CLIENT_ID      e.g. web-app-ui-hackcanton-01-devnet
+#   LEDGER_OIDC_SCOPE          e.g. "openid daml_ledger_api offline_access"
+#   LEDGER_OIDC_REFRESH_TOKEN  offline/refresh token (preferred), or
+#   LEDGER_OIDC_USERNAME / LEDGER_OIDC_PASSWORD   password grant
+OIDC_URL = os.environ.get("LEDGER_OIDC_TOKEN_URL", "")
+OIDC_CLIENT = os.environ.get("LEDGER_OIDC_CLIENT_ID", "")
+OIDC_SCOPE = os.environ.get("LEDGER_OIDC_SCOPE", "openid daml_ledger_api offline_access")
+OIDC_REFRESH = os.environ.get("LEDGER_OIDC_REFRESH_TOKEN", "")
+OIDC_USER = os.environ.get("LEDGER_OIDC_USERNAME", "")
+OIDC_PASS = os.environ.get("LEDGER_OIDC_PASSWORD", "")
+
+
+class _OidcAuth(httpx.Auth):
+    """Bearer auth that refreshes itself against Keycloak before expiry."""
+
+    def __init__(self) -> None:
+        self._access = ""
+        self._exp = 0.0
+        self._refresh = OIDC_REFRESH
+
+    def _fetch(self) -> None:
+        import time
+        if self._refresh:
+            form = {"grant_type": "refresh_token", "client_id": OIDC_CLIENT,
+                    "refresh_token": self._refresh}
+        else:
+            form = {"grant_type": "password", "client_id": OIDC_CLIENT,
+                    "username": OIDC_USER, "password": OIDC_PASS,
+                    "scope": OIDC_SCOPE}
+        r = httpx.post(OIDC_URL, data=form, timeout=20.0)
+        r.raise_for_status()
+        tok = r.json()
+        self._access = tok["access_token"]
+        self._exp = time.time() + float(tok.get("expires_in", 300)) - 60
+        if tok.get("refresh_token"):        # Keycloak may rotate it
+            self._refresh = tok["refresh_token"]
+
+    def auth_flow(self, request):
+        import time
+        if not self._access or time.time() >= self._exp:
+            self._fetch()
+        request.headers["Authorization"] = f"Bearer {self._access}"
+        yield request
+
 # template short-name -> archiving authority (signatory), for reset()
 _ARCHIVE_AS = {
     "Vault": "operator", "ShareHolding": "operator", "Allocation": "operator",
@@ -55,11 +103,16 @@ def _tpl(entity: str, module: str = "BasisVault.Vault") -> str:
 
 class LedgerBridge:
     def __init__(self, base: str | None = None) -> None:
-        headers = {"Authorization": f"Bearer {TOKEN}"} if TOKEN else {}
+        headers = {}
+        auth = None
+        if OIDC_URL and OIDC_CLIENT and (OIDC_REFRESH or (OIDC_USER and OIDC_PASS)):
+            auth = _OidcAuth()          # self-refreshing bearer (shared DevNet node)
+        elif TOKEN:
+            headers["Authorization"] = f"Bearer {TOKEN}"
         if HOST:
             headers["Host"] = HOST
         self._http = httpx.Client(base_url=base or BASE, timeout=25.0,
-                                  headers=headers)
+                                  headers=headers, auth=auth)
         self.label = LABEL
         self.party: dict[str, str] = {}
         self._ready = False
@@ -86,8 +139,17 @@ class LedgerBridge:
             if h not in existing:
                 r = self._http.post("/v2/parties", json={
                     "partyIdHint": h, "identityProviderId": ""})
+                if r.status_code in (401, 403):
+                    # shared node: allocation is admin-gated — parties must be
+                    # pre-allocated by the operator (see docs/TESTNET.md)
+                    log.warning("party allocation forbidden; missing hint %r", h)
+                    continue
                 r.raise_for_status()
                 existing[h] = r.json()["partyDetails"]["party"]
+        missing = [h for h in HINTS if h not in existing]
+        if missing:
+            raise RuntimeError(
+                f"parties missing and not allocatable on this participant: {missing}")
         self.party = {h: existing[h] for h in HINTS}
 
         rights = ([{"kind": {"CanActAs": {"value": {"party": p}}}} for p in self.party.values()]
@@ -100,6 +162,11 @@ class LedgerBridge:
         if r.status_code == 409:  # user exists — top up rights (e.g. new party)
             self._http.post(f"/v2/users/{USER}/rights", json={
                 "userId": USER, "rights": rights, "identityProviderId": ""})
+        elif r.status_code in (401, 403):
+            # shared node: user admin is gated — trust the operator-granted
+            # rights and verify we can actually read as our parties
+            log.warning("user management forbidden; relying on pre-granted rights")
+            self._http.get(f"/v2/users/{USER}").raise_for_status()
         else:
             r.raise_for_status()
 
