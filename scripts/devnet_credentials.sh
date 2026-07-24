@@ -10,10 +10,16 @@
 # systemd wiring instructions.
 set -euo pipefail
 
-TOKEN_URL="https://keycloak.naas.noders.services/realms/noders-appsfactory/protocol/openid-connect/token"
-CLIENT_ID="web-app-ui-hackcanton-01-devnet"
-SCOPE="openid daml_ledger_api offline_access"
-JSON_API="https://ledger-api-json.participant.hackcanton-01.devnet.naas.noders.services:443"
+# Node endpoints come from the hackathon Materials page ("DevNet node
+# materials") — pass them via env; they are intentionally NOT hardcoded in
+# this public repo:
+#   DEVNET_TOKEN_URL=...keycloak token endpoint...
+#   DEVNET_CLIENT_ID=...oidc client id...
+#   DEVNET_JSON_API=https://...json ledger api...:443
+TOKEN_URL="${DEVNET_TOKEN_URL:?set DEVNET_TOKEN_URL (Materials page: OIDC URL)}"
+CLIENT_ID="${DEVNET_CLIENT_ID:?set DEVNET_CLIENT_ID (Materials page: client_id)}"
+SCOPE="${DEVNET_SCOPE:-openid daml_ledger_api offline_access}"
+JSON_API="${DEVNET_JSON_API:?set DEVNET_JSON_API (Materials page: JSON Ledger API)}"
 ENV_FILE="/root/basisvault/.env.devnet"
 
 read -r -p "AppsFactory email: " AF_USER
