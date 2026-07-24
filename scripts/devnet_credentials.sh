@@ -4,65 +4,93 @@
 # Run this YOURSELF over SSH (it prompts interactively — your password is never
 # echoed, never stored; only the OIDC *offline/refresh token* is kept):
 #
-#   bash /root/basisvault/scripts/devnet_credentials.sh
+#   DEVNET_TOKEN_URL=... DEVNET_CLIENT_ID=... DEVNET_JSON_API=... \
+#     bash /root/basisvault/scripts/devnet_credentials.sh
 #
-# Writes /root/basisvault/.env.devnet (chmod 600, gitignored) and prints the
-# systemd wiring instructions.
+# Endpoint values come from the hackathon Materials page ("DevNet node
+# materials") — intentionally NOT hardcoded in this public repo.
+# Writes /root/basisvault/.env.devnet (chmod 600, gitignored).
 set -euo pipefail
 
-# Node endpoints come from the hackathon Materials page ("DevNet node
-# materials") — pass them via env; they are intentionally NOT hardcoded in
-# this public repo:
-#   DEVNET_TOKEN_URL=...keycloak token endpoint...
-#   DEVNET_CLIENT_ID=...oidc client id...
-#   DEVNET_JSON_API=https://...json ledger api...:443
 TOKEN_URL="${DEVNET_TOKEN_URL:?set DEVNET_TOKEN_URL (Materials page: OIDC URL)}"
 CLIENT_ID="${DEVNET_CLIENT_ID:?set DEVNET_CLIENT_ID (Materials page: client_id)}"
 SCOPE="${DEVNET_SCOPE:-openid daml_ledger_api offline_access}"
 JSON_API="${DEVNET_JSON_API:?set DEVNET_JSON_API (Materials page: JSON Ledger API)}"
-ENV_FILE="/root/basisvault/.env.devnet"
 
 read -r -p "AppsFactory email: " AF_USER
 read -r -s -p "AppsFactory password (input hidden): " AF_PASS; echo
 
-echo "→ requesting tokens from Keycloak..."
-RESP=$(curl -sS "$TOKEN_URL" \
-  -H 'Content-Type: application/x-www-form-urlencoded' \
-  --data-urlencode 'grant_type=password' \
-  --data-urlencode "client_id=$CLIENT_ID" \
-  --data-urlencode "username=$AF_USER" \
-  --data-urlencode "password=$AF_PASS" \
-  --data-urlencode "scope=$SCOPE")
-unset AF_PASS
+export TOKEN_URL CLIENT_ID SCOPE JSON_API AF_USER AF_PASS
+python3 - <<'EOF'
+import base64, json, os, sys, urllib.parse, urllib.request
 
-ACCESS=$(echo "$RESP" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("access_token",""))')
-REFRESH=$(echo "$RESP" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("refresh_token",""))')
-if [ -z "$REFRESH" ]; then
-  echo "!! no refresh token in response:"; echo "$RESP" | head -c 400; exit 1
-fi
+token_url = os.environ["TOKEN_URL"]
+form = urllib.parse.urlencode({
+    "grant_type": "password",
+    "client_id": os.environ["CLIENT_ID"],
+    "username": os.environ["AF_USER"],
+    "password": os.environ["AF_PASS"],
+    "scope": os.environ["SCOPE"],
+}).encode()
 
-# ledger user id = the JWT's sub claim
-SUB=$(echo "$ACCESS" | cut -d. -f2 | python3 -c 'import base64,json,sys;p=sys.stdin.read();p+="="*(-len(p)%4);print(json.loads(base64.urlsafe_b64decode(p)).get("sub",""))')
-echo "→ token OK. ledger user id (sub): $SUB"
+req = urllib.request.Request(token_url, data=form, headers={
+    "Content-Type": "application/x-www-form-urlencoded"})
+try:
+    with urllib.request.urlopen(req, timeout=30) as r:
+        tok = json.load(r)
+except urllib.error.HTTPError as e:
+    body = e.read().decode(errors="replace")
+    sys.exit(f"!! Keycloak refused the request (HTTP {e.code}):\n   {body[:400]}\n"
+             "   (invalid_grant usually means wrong email/password; "
+             "invalid_scope means drop DEVNET_SCOPE and retry)")
 
-echo -n "→ probing JSON Ledger API with the token... "
-CODE=$(curl -s -o /tmp/devnet-probe.json -w "%{http_code}" -H "Authorization: Bearer $ACCESS" "$JSON_API/v2/state/ledger-end")
-echo "HTTP $CODE $(head -c 120 /tmp/devnet-probe.json)"
+access = tok.get("access_token", "")
+refresh = tok.get("refresh_token", "")
+if not access or not refresh:
+    sys.exit(f"!! unexpected token response: {json.dumps(tok)[:400]}")
 
-umask 077
-cat > "$ENV_FILE" <<ENV
-LEDGER_API_BASE=$JSON_API
-LEDGER_OIDC_TOKEN_URL=$TOKEN_URL
-LEDGER_OIDC_CLIENT_ID=$CLIENT_ID
-LEDGER_OIDC_SCOPE=$SCOPE
-LEDGER_OIDC_REFRESH_TOKEN=$REFRESH
-LEDGER_USER_ID=$SUB
+def jwt_claims(t):
+    try:
+        p = t.split(".")[1]
+        p += "=" * (-len(p) % 4)
+        return json.loads(base64.urlsafe_b64decode(p))
+    except Exception:
+        return {}
+
+claims = jwt_claims(access)
+sub = claims.get("sub", "")
+print(f"→ token OK. expires_in={tok.get('expires_in')}s  "
+      f"refresh_expires_in={tok.get('refresh_expires_in')}s  sub={sub or '<undecoded>'}")
+
+# probe the JSON Ledger API with the fresh token
+probe = urllib.request.Request(
+    os.environ["JSON_API"].rstrip("/") + "/v2/state/ledger-end",
+    headers={"Authorization": f"Bearer {access}"})
+try:
+    with urllib.request.urlopen(probe, timeout=30) as r:
+        print(f"→ JSON Ledger API probe: HTTP {r.status} {r.read(200).decode(errors='replace')}")
+except urllib.error.HTTPError as e:
+    print(f"→ JSON Ledger API probe: HTTP {e.code} {e.read(200).decode(errors='replace')}")
+
+env_file = "/root/basisvault/.env.devnet"
+os.umask(0o077)
+with open(env_file, "w") as f:
+    f.write(f"""LEDGER_API_BASE={os.environ['JSON_API']}
+LEDGER_OIDC_TOKEN_URL={token_url}
+LEDGER_OIDC_CLIENT_ID={os.environ['CLIENT_ID']}
+LEDGER_OIDC_SCOPE={os.environ['SCOPE']}
+LEDGER_OIDC_REFRESH_TOKEN={refresh}
+LEDGER_USER_ID={sub}
 LEDGER_LABEL=Canton DevNet · NODERS hackcanton-01 · JSON Ledger API v2
-ENV
-echo "→ wrote $ENV_FILE (mode 600)."
-echo
-echo "Wire it into the dashboard with:"
-echo "  systemctl edit basisvault-dashboard   # add under [Service]:"
-echo "      EnvironmentFile=/root/basisvault/.env.devnet"
-echo "  systemctl restart basisvault-dashboard"
-echo "Revert to sandbox anytime:  systemctl revert basisvault-dashboard && systemctl restart basisvault-dashboard"
+""")
+print(f"→ wrote {env_file} (mode 600).")
+print("""
+Wire it into the dashboard with:
+  systemctl edit basisvault-dashboard   # add under [Service]:
+      EnvironmentFile=/root/basisvault/.env.devnet
+  systemctl restart basisvault-dashboard
+Revert to sandbox anytime:
+  systemctl revert basisvault-dashboard && systemctl restart basisvault-dashboard
+""")
+EOF
+unset AF_PASS
