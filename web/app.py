@@ -178,7 +178,12 @@ def state_for(role: str) -> dict:
                 "valueUsd": round(shares * 1.0, 2),
                 "yourYieldPct": _pct(blended_now),
             },
-            "note": "A holder sees their own holding + NAV + headline yield — not the strategy book.",
+            "note": "You always know where the money goes: the mandate — short BTC/ETH perp on "
+                    "Hyperliquid + long cBTC/cETH in Canton custody, net delta 0, realized funding "
+                    "only — is public, and the vault's accounting rules are enforced on-chain. "
+                    "What's hidden is only the live position blotter: the fund auditor sees it in "
+                    "real time on your behalf — the market doesn't, because a visible delta-neutral "
+                    "book gets traded against.",
         }
     else:  # auditor
         marks = _hl_marks()

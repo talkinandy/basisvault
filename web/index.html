@@ -452,7 +452,8 @@ function renderBook(b){
         <div class="big">${fmtUsd(h.valueUsd)}</div>
         <div style="color:rgba(255,255,255,.65);font-size:14px;margin-top:4px">${h.shares.toLocaleString()} shares · earning ~${pct(h.yourYieldPct)} net</div></div>
       <p style="color:rgba(255,255,255,.6);font-size:13.5px;margin-top:16px">${b.note}</p>
-      <div class="locked" style="margin-top:14px"><table class="btable"><tr><td>strategy book</td><td class="num">••••</td></tr><tr><td>other holders</td><td class="num">••••</td></tr></table></div>`;
+      <div class="locked" style="margin-top:14px"><table class="btable"><tr><td>live position blotter</td><td class="num">••••</td></tr><tr><td>other holders</td><td class="num">••••</td></tr></table></div>
+      <p style="color:rgba(255,255,255,.45);font-size:12px;margin-top:8px">⛨ blurred for the market — fully visible to the fund auditor, live. Flip to the Observer tab to see exactly what they see.</p>`;
     return;
   }
   // auditor
@@ -537,7 +538,9 @@ function renderLC(s){
   }else{
     feed=[...s.events].reverse().map(e=>`<div class="lc-ev"><div class="t">${e.title}</div>
       <div class="d">${e.detail}</div><div class="daml">⛓ ${e.daml}${e.updateId?` · <span title="${e.updateId}">tx ${e.updateId.slice(0,14)}…</span>`:''}</div></div>`).join('');
-    if(s.hiddenCount>0) feed+=`<div class="lc-hidden">🔒 ${s.hiddenCount} event(s) hidden from the ${s.role} — need-to-know</div>`;
+    if(s.hiddenCount>0) feed+=s.role==='holder'
+      ?`<div class="lc-hidden">🔒 ${s.hiddenCount} position-level event(s) — visible to the fund auditor in real time, not to the market. Your mandate & NAV rules are public and on-chain; only the live blotter is confidential (a visible delta-neutral book gets traded against).</div>`
+      :`<div class="lc-hidden">🔒 ${s.hiddenCount} event(s) hidden from the ${s.role} — need-to-know</div>`;
     if(!s.events.length&&!s.hiddenCount) feed=`<div class="lc-empty">Press ▶ Next step to run the first on-chain move.</div>`;
   }
   $('#lc-feed').innerHTML=feed;
