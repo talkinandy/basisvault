@@ -101,26 +101,87 @@ Reproduce: `python scripts/fetch_hl_funding.py && python -m basisvault_engine.ba
 
 ## 4. Pilot plan — see [`PILOT_PLAN.md`](PILOT_PLAN.md)
 
-## 5. Demo script (≈3 min, Grand Final)
+## 5. Demo script (≈3 min)
 
-1. **The pitch** (20s) — "Leveraged traders pay rent every hour. This vault
-   collects it: short the HL perp, long cBTC/cETH on Canton, price cancels,
-   funding remains. It's the live basisyield.com mechanism with the spot leg in
-   Canton custody."
-2. **Deposit** — Alice deposits $1M USDCx → shares minted at NAV (real tx id on
-   screen).
-3. **Open carry (create)** — manager proposes both pairs at live HL marks;
-   operator approves at the oracle feed; net-delta guard on-chain.
-4. **Accrue (update status)** — a quarter of real trailing funding accrues:
-   NAV/share rises; show it's notional × oracle rate × time, nothing invented.
-5. **Privacy wow-moment** — flip roles: **observer sees the whole book (ledger
-   says N contracts), holder sees only their holding, outsider sees zero** —
-   and point out the counts come from Canton's ACS, not the UI.
-6. **Transfer + sign-guard unwind + redeem (fulfill)** — holding moves
-   Alice→Bob; guard unwinds both legs; Bob redeems at the higher NAV.
-7. **Honest numbers** (20s) — 3.2y of real HL funding: 12.2% APY, 0.21% maxDD,
-   range 4.7–22.6%, today ~4.7%. Next phase: DBS gold + T-bill margin stacks
-   ~5% on top — margin that earns is the edge no crypto venue has.
+**Pre-flight (off camera):** open canton.basisyield.com → role tab **Observer**
+→ ↺ Reset once and let it finish → do one full warm-up run, then Reset again
+(warms the node + HL marks cache, so on-camera steps land in ~2s) → scroll so
+the lifecycle panel fills the frame. Every claim below is on-screen — no slides.
+
+---
+
+**[0:00–0:20 · Hook — the badge]**
+> "Leveraged traders pay rent every hour to hold their positions. BasisYield
+> collects it: short the BTC/ETH perp on Hyperliquid, long cBTC and cETH in
+> Canton custody — price risk cancels, funding remains. And this is not a
+> simulation —" *(point at the badge)* "— everything you're about to see
+> executes on **Canton DevNet**, on the network's own validator."
+
+**[0:20–0:40 · Step 1 — Deposit]**
+Click **▶ Deposit**; let the *"submitting to Canton…"* spinner be visible.
+> "Alice deposits a million USDCx. Watch the button — that's a real ~2-second
+> round trip to the participant, and here's the transaction id the ledger
+> returned." *(scroll briefly to the **On-the-wire panel**)* "This panel is the
+> raw JSON Ledger API traffic — the exact command we sent, and Canton's
+> response: update id, offset, record time. No facade."
+
+**[0:40–1:00 · Step 2 — Open carry]**
+Click **▶ Open carry**.
+> "The strategy engine proposes two pairs — it can only *propose*; the
+> custodian approves. Both open at **live Hyperliquid mid marks**, and the
+> net-delta-zero hedge isn't a policy — it's **asserted in the Daml template**.
+> If the legs don't cancel, the transaction fails."
+
+**[1:00–1:35 · Step 3 — Accrue + the anatomy card (centerpiece)]**
+Click **▶ Accrue funding**; the two anatomy cards appear.
+> "Here's why this is yield and not a bet. Left leg: spot cBTC in Canton
+> custody — earns nothing, cancels price. Right leg: the short perp — 400k of
+> notional margined by just **80k at 5×**, that's the bar; leverage here is
+> capital efficiency, bounded by the liquidation buffer. And the only thing
+> that moves NAV is this —" *(trace the animated funding flow)* "— funding paid
+> by leveraged longs, at the **real trailing Hyperliquid rate**, marked to an
+> oracle feed: 400k × 7.9% × a quarter = **$7,933 on BTC**, $6,515 on ETH.
+> NAV per share just went from 1.0000 to 1.0144. Realized only — the template
+> cannot book yield that wasn't received."
+
+**[1:35–2:10 · The privacy flip — three sets of eyes]**
+Flip role tabs: **Issuer → Holder → Outsider**, ending back on Observer.
+> "Same vault, three sets of eyes — and the contract counts you see are
+> **Canton's own answers**, per party, from the ledger's active-contract set —
+> not UI filtering. The issuer sees everything it signs. The **holder** —"
+> *(pause on Holder)* "— always knows the mandate; it's public and the
+> accounting rules are on-chain. What's confidential is only the live blotter,
+> because a visible delta-neutral book gets traded against — and it's not
+> hidden from everyone: **the fund auditor sees it live**, on the holder's
+> behalf. The **outsider** sees zero contracts. This is the thing a
+> transparent chain cannot do, and it's why this strategy can exist on-chain
+> at all."
+
+**[2:10–2:30 · Steps 4–6 — Transfer, unwind, redeem]**
+Click through **Transfer**, **Unwind**, **Redeem**.
+> "Shares are transferable Daml holdings — Alice's position moves to Bob,
+> propose-accept-settle. The sign guard unwinds both legs — the short never
+> pays through a negative regime. And Bob redeems at the higher NAV:
+> **$1,014,448 out**. Vault empty, books exact."
+
+**[2:30–3:00 · Honest numbers + close]**
+Scroll to the backtest section.
+> "The numbers: we replayed our production rules over **every hourly funding
+> print Hyperliquid has ever paid** — 3.2 years, both assets: **12.2% APY,
+> 0.21% max drawdown**, rolling one-year range 4.7 to 22.6 — and today's
+> compressed regime is the *bottom* of that range; we say so on the page.
+> This is the live basisyield.com engine brought on-chain. Next phase is
+> already validated: gold — the short leg exists on Hyperliquid today, 168
+> million of open interest, 6.8% backtested — waiting only for the DBS gold
+> token on Canton. And then margin that *earns while it backs the trade* —
+> the edge no crypto venue can copy. Leveraged traders pay rent every hour.
+> Now there's an auditable place to collect it."
+
+---
+
+Fallback: if DevNet hiccups mid-recording, `systemctl revert
+basisvault-dashboard && systemctl restart basisvault-dashboard` flips to the
+local sandbox — same flow, same script, drop the word "DevNet".
 
 ## 6. Deliverable checklist
 
