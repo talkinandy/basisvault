@@ -214,7 +214,7 @@ local sandbox — same flow, same script, drop the word "DevNet".
 - **Venue execution is mocked in the demo** — the Canton ledger, the workflow,
   the privacy and the funding data are real; HL order placement is not armed
   (the production execution stack exists but stays out of a hackathon demo).
-- **Funding is regime-dependent** — the range (4.7–22.6% rolling-1y) is the
+- **Funding is regime-dependent** — the range (4.5–22.6% rolling-1y) is the
   honest statement; today sits at the bottom. The sign guard means compressed
   funding degrades toward 0%, not negative.
 - **cETH integration is access-gated** (OnRails contact flow) — pilot step 1

@@ -12,7 +12,7 @@ cBTC (BitSafe) and cETH (OnRails) — and no mature Canton perp venue exists yet
 Cash-and-carry is the institutional yield you can actually run on that menu
 *today*: spot leg in Canton custody, funding leg on the deepest perp venue there
 is. Backtested on **every hourly funding print Hyperliquid has paid over 3.2
-years**: **12.2% APY, 0.21% max drawdown**, rolling-1y range **4.7–22.6%**
+years**: **12.2% APY, 0.21% max drawdown**, rolling-1y range **4.5–22.6%**
 (today's compressed regime sits at the bottom of the range — stated, not hidden).
 
 ## ICP — who it's for
