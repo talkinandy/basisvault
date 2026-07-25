@@ -233,7 +233,20 @@ _DEMO_NOTIONAL = 400_000.0        # per asset: 2 pairs × $400k = 80% deployed
 
 def _fresh_lc(mode: str = "mock") -> dict:
     return {"i": 0, "aum": 0.0, "shares": 0.0, "alice": 0.0, "bob": 0.0,
-            "positions": [], "accrued": 0.0, "events": [], "mode": mode}
+            "positions": [], "accrued": 0.0, "events": [], "mode": mode,
+            "accrual": None}
+
+
+def _accrual_detail(assets: list[dict], total: float) -> dict:
+    """Per-pair anatomy for the step-3 visual: both legs, margin, and the
+    realized funding flow — real numbers from the run."""
+    return {
+        "assets": assets,
+        "totalEarnedUsd": round(total, 2),
+        "leverage": LEVERAGE,
+        "capitalEfficiencyPct": _pct(CAP_EFF),
+        "perPairCapitalUsd": round(_DEMO_NOTIONAL * (1 + 1 / LEVERAGE), 2),
+    }
 
 
 _LC = _fresh_lc("ledger" if BRIDGE.ensure() else "mock")
@@ -280,6 +293,14 @@ def _lc_run(step: str) -> None:
         earned = sum(p["notional"] * p["rate"] * 0.25 for p in _LC["positions"])
         _LC["aum"] += earned
         _LC["accrued"] += earned
+        _LC["accrual"] = _accrual_detail([
+            {"underlying": p["underlying"],
+             "perp": CARRY_ASSETS[p["underlying"]]["perp"],
+             "spot": CARRY_ASSETS[p["underlying"]]["spot"],
+             "notionalUsd": p["notional"], "aprPct": _pct(p["rate"]),
+             "marginUsd": round(p["notional"] / LEVERAGE, 2),
+             "earnedUsd": round(p["notional"] * p["rate"] * 0.25, 2)}
+            for p in _LC["positions"]], earned)
         _lc_event(step, f"One quarter of funding accrues: +${earned:,.0f}",
                   f"realized only — notional × trailing HL funding × 0.25y; NAV/share → {_lc_pps():.4f}",
                   "Vault_AccrueFunding", ["issuer", "observer"])
@@ -308,6 +329,7 @@ def _lc_run(step: str) -> None:
         _LC["aum"] -= value
         _LC["shares"] = 0.0
         _LC["bob"] = 0.0
+        _LC["accrual"] = None
 
 
 def _lc_sync_from_ledger() -> None:
@@ -363,6 +385,7 @@ def _lc_run_ledger(step: str) -> None:
     elif step == "accrue":
         total = 0.0
         last_up = None
+        detail: list[dict] = []
         for pos in br.find("operator", "DeltaNeutralPosition"):
             u = pos["arg"]["underlying"]["tag"]
             feed = next(f for f in br.find("oracle", "RateFeed")
@@ -371,10 +394,19 @@ def _lc_run_ledger(step: str) -> None:
                             {"positionCid": pos["cid"], "rateFeedCid": feed["cid"],
                              "yearFraction": "0.25"},
                             )
-            total += (float(pos["arg"]["shortNotional"])
-                      * float(feed["arg"]["annualizedRate"]) * 0.25)
+            notional = float(pos["arg"]["shortNotional"])
+            rate = float(feed["arg"]["annualizedRate"])
+            earned = notional * rate * 0.25
+            total += earned
             last_up = r["updateId"]
+            detail.append({
+                "underlying": u, "perp": CARRY_ASSETS[u]["perp"],
+                "spot": CARRY_ASSETS[u]["spot"],
+                "notionalUsd": notional, "aprPct": _pct(rate),
+                "marginUsd": round(notional / LEVERAGE, 2),
+                "earnedUsd": round(earned, 2)})
         _LC["accrued"] += total
+        _LC["accrual"] = _accrual_detail(detail, total)
         _lc_sync_from_ledger()
         _lc_event(step, f"One quarter of funding accrues: +${total:,.0f}",
                   f"realized only — notional × trailing HL funding × 0.25y; NAV/share → {_lc_pps():.4f}",
@@ -416,6 +448,7 @@ def _lc_run_ledger(step: str) -> None:
         _lc_event(step, f"Bob redeems at the higher NAV: ${value:,.0f}",
                   f"entered via transfer at NAV/share {_lc_pps():.4f} — yield travelled with the shares",
                   "RedeemRequest_Accept → Vault_BurnShares", ["issuer", "observer"], r["updateId"])
+        _LC["accrual"] = None
     _lc_sync_from_ledger()
 
 
@@ -440,6 +473,7 @@ def _lc_view(role: str) -> dict:
         "events": visible, "hiddenCount": hidden,
         "role": role,
         "ledger": _lc_ledger_info(role),
+        "accrual": _LC.get("accrual") if role in ("issuer", "observer") else None,
         # the raw JSON Ledger API exchanges behind the buttons — same for every
         # role (it's OUR app's traffic; role privacy applies to ledger reads,
         # not to showing what the demo itself submitted)
