@@ -132,24 +132,31 @@ Click **▶ Open carry**.
 > net-delta-zero hedge isn't a policy — it's **asserted in the Daml template**.
 > If the legs don't cancel, the transaction fails."
 
-**[1:00–1:35 · Step 3 — Accrue + the anatomy card (centerpiece)]**
-Click **▶ Accrue funding**; the two anatomy cards appear.
+**[1:00–1:45 · Step 3 — Accrue + the anatomy cards (centerpiece)]**
+Click **▶ Accrue funding**; the two anatomy cards + the gold next-phase strip
+appear.
 > "Here's why this is yield and not a bet. Left leg: spot cBTC in Canton
 > custody — earns nothing, cancels price. Right leg: the short perp — 400k of
-> notional margined by just **80k at 5×**, that's the bar; leverage here is
-> capital efficiency, bounded by the liquidation buffer. And the only thing
-> that moves NAV is this —" *(trace the animated funding flow)* "— funding paid
-> by leveraged longs, at the **real trailing Hyperliquid rate**, marked to an
-> oracle feed: 400k × 7.9% × a quarter = **$7,933 on BTC**, $6,515 on ETH.
-> NAV per share just went from 1.0000 to 1.0144. Realized only — the template
-> cannot book yield that wasn't received. And below — clearly marked as *next
-> phase*, not this run — the same seams take a **third pair, gold**: the short
-> leg is live on Hyperliquid today with 168 million of open interest, waiting
-> only for the DBS gold token. And the margin upgrade: tokenized T-bills that
-> **earn five percent while backing the carry** — dead margin is what every
-> crypto venue charges; Canton removes it."
+> notional margined by just **80k at 5×** — you can *see* the leverage, that's
+> the one-fifth-filled bar. And the only thing that moves NAV is this —"
+> *(trace the animated funding flow)* "— funding paid by leveraged longs at
+> the **real trailing Hyperliquid rate**: $7,933 on BTC this quarter — **6.6%
+> a year on the pair's capital**, and the strip up top annualizes the whole
+> vault at ~5.8%. Realized only — the template cannot book yield that wasn't
+> received.
+>
+> And below, in gold, clearly marked *not part of this run* — the roadmap in
+> the same picture-language. **The third pair: gold.** See the two legs? The
+> short leg is **solid — it's live today**: Hyperliquid's XAU perp, 168
+> million of open interest, 6.8% a year backtested on its entire funding
+> history. The long leg is **dashed** — the DBS gold token, H2 2026. One leg
+> exists; we're waiting on the other. And next to it, the RWA upgrade as four
+> bars: today's margin earns **zero**, like every crypto venue — tokenized
+> T-bill margin earns **5.2% while backing the carry**, stack the funding on
+> top and the sleeve backtests at **11.6%**. Dead margin is a fee; Canton
+> removes it."
 
-**[1:35–2:10 · The privacy flip — three sets of eyes]**
+**[1:45–2:15 · The privacy flip — three sets of eyes]**
 Flip role tabs: **Issuer → Holder → Outsider**, ending back on Observer.
 > "Same vault, three sets of eyes — and the contract counts you see are
 > **Canton's own answers**, per party, from the ledger's active-contract set —
@@ -162,25 +169,22 @@ Flip role tabs: **Issuer → Holder → Outsider**, ending back on Observer.
 > transparent chain cannot do, and it's why this strategy can exist on-chain
 > at all."
 
-**[2:10–2:30 · Steps 4–6 — Transfer, unwind, redeem]**
+**[2:15–2:35 · Steps 4–6 — Transfer, unwind, redeem]**
 Click through **Transfer**, **Unwind**, **Redeem**.
 > "Shares are transferable Daml holdings — Alice's position moves to Bob,
 > propose-accept-settle. The sign guard unwinds both legs — the short never
 > pays through a negative regime. And Bob redeems at the higher NAV:
 > **$1,014,448 out**. Vault empty, books exact."
 
-**[2:30–3:00 · Honest numbers + close]**
+**[2:35–3:00 · Honest numbers + close]**
 Scroll to the backtest section.
-> "The numbers: we replayed our production rules over **every hourly funding
-> print Hyperliquid has ever paid** — 3.2 years, both assets: **12.2% APY,
-> 0.21% max drawdown**, rolling one-year range 4.7 to 22.6 — and today's
-> compressed regime is the *bottom* of that range; we say so on the page.
-> This is the live basisyield.com engine brought on-chain. Next phase is
-> already validated: gold — the short leg exists on Hyperliquid today, 168
-> million of open interest, 6.8% backtested — waiting only for the DBS gold
-> token on Canton. And then margin that *earns while it backs the trade* —
-> the edge no crypto venue can copy. Leveraged traders pay rent every hour.
-> Now there's an auditable place to collect it."
+> "The full numbers: our production rules replayed over **every hourly
+> funding print Hyperliquid has ever paid** — 3.2 years, both assets:
+> **12.2% APY, 0.21% max drawdown**, rolling one-year range 4.7 to 22.6 —
+> and today's compressed regime is the *bottom* of that range; we say so on
+> the page. This is the live basisyield.com engine brought on-chain, with
+> gold and RWA margin already validated behind the same seams. Leveraged
+> traders pay rent every hour. Now there's an auditable place to collect it."
 
 ---
 
