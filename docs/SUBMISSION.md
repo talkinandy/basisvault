@@ -80,18 +80,18 @@ negative regime.
 ## 2. Proof — honest backtest on the real venue's data
 
 The production entry/exit rules replayed over **every hourly funding print
-Hyperliquid has paid for BTC and ETH (3.2 years, 27,427 prints each)** —
+Hyperliquid has paid for BTC and ETH (3.2 years, 27,534 prints each)** —
 non-lookahead (decide on the trailing 3-day window, accrue the next print),
 both-legs costs on every open/unwind, sign-guarded, realized funding only:
 
 | | APY | Max drawdown | Deployed | Round trips |
 |---|---|---|---|---|
-| **cBTC sleeve** | 12.33% | — | 84% of hours | 28 |
-| **cETH sleeve** | 12.11% | — | 81% of hours | 36 |
-| **Blended vault (hero)** | **12.22%** | **0.21%** | — | — |
+| **cBTC sleeve** | 12.31% | — | 84% of hours | 28 |
+| **cETH sleeve** | 12.10% | — | 81% of hours | 36 |
+| **Blended vault (hero)** | **12.20%** | **0.21%** | — | — |
 
-Rolling-1y range **4.7% / 11.7% / 22.6%** (min/median/max); **today's trailing
-1y ≈ 4.7%** — the current compressed-funding regime is the bottom of the range
+Rolling-1y range **4.5% / 11.7% / 22.6%** (min/median/max); **today's trailing
+1y ≈ 4.5%** — the current compressed-funding regime is the bottom of the range
 and we say so. Next-phase projection (RWA-margin stacking, 5y of BTC funding +
 FRED rates): blended 8.7% APY with a ~5% collateral floor.
 
@@ -140,9 +140,9 @@ appear.
 > notional margined by just **80k at 5×** — you can *see* the leverage, that's
 > the one-fifth-filled bar. And the only thing that moves NAV is this —"
 > *(trace the animated funding flow)* "— funding paid by leveraged longs at
-> the **real trailing Hyperliquid rate**: $7,933 on BTC this quarter — **6.6%
+> the **real trailing Hyperliquid rate**: $8,861 on BTC this quarter — **7.4%
 > a year on the pair's capital**, and the strip up top annualizes the whole
-> vault at ~5.8%. Realized only — the template cannot book yield that wasn't
+> vault at ~6.7%. Realized only — the template cannot book yield that wasn't
 > received.
 >
 > And below, in gold, clearly marked *not part of this run* — the roadmap in
@@ -174,13 +174,13 @@ Click through **Transfer**, **Unwind**, **Redeem**.
 > "Shares are transferable Daml holdings — Alice's position moves to Bob,
 > propose-accept-settle. The sign guard unwinds both legs — the short never
 > pays through a negative regime. And Bob redeems at the higher NAV:
-> **$1,014,448 out**. Vault empty, books exact."
+> **$1,016,760 out**. Vault empty, books exact."
 
 **[2:35–3:00 · Honest numbers + close]**
 Scroll to the backtest section.
 > "The full numbers: our production rules replayed over **every hourly
 > funding print Hyperliquid has ever paid** — 3.2 years, both assets:
-> **12.2% APY, 0.21% max drawdown**, rolling one-year range 4.7 to 22.6 —
+> **12.2% APY, 0.21% max drawdown**, rolling one-year range 4.5 to 22.6 —
 > and today's compressed regime is the *bottom* of that range; we say so on
 > the page. This is the live basisyield.com engine brought on-chain, with
 > gold and RWA margin already validated behind the same seams. Leveraged

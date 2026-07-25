@@ -26,7 +26,7 @@
 3. **Check the numbers aren't invented** — reproduce the headline backtest:
    ```bash
    cd engine && python -m basisvault_engine.backtest
-   # [HL CARRY hero] 3.20y  APY 12.22%  maxDD 0.21%  5x (cap-eff 83%)
+   # [HL CARRY hero] 3.21y  APY 12.20%  maxDD 0.21%  5x (cap-eff 83%)
    ```
    The dataset (`engine/data/hl_*_funding.json`, committed) is **every hourly
    funding print Hyperliquid has paid for BTC and ETH since May 2023** — the
@@ -87,7 +87,7 @@ against the vault as a primitive.
 
 ## Honest numbers (and what we don't claim)
 
-Backtest = the production entry/exit rules replayed over **27,427 hourly
+Backtest = the production entry/exit rules replayed over **27,534 hourly
 funding prints × 2 assets** (all of HL history): non-lookahead, both-legs costs
 on every round trip, sign-guarded (never holds through negative funding), 5×
 perp leverage bounded by the liquidation buffer → 83% of capital earning.
@@ -95,7 +95,7 @@ perp leverage bounded by the liquidation buffer → 83% of capital earning.
 | | APY | Max DD | Notes |
 |---|---|---|---|
 | **cBTC + cETH carry (hero)** | **12.2%** | **0.21%** | sleeves 12.3% / 12.1%; deployed ~82% of hours |
-| Rolling-1y range | **4.7% – 22.6%** | | median 11.7% — **today's regime ≈ 4.7%, the bottom; stated, not hidden** |
+| Rolling-1y range | **4.5% – 22.6%** | | median 11.7% — **today's regime ≈ 4.5%, the bottom; stated, not hidden** |
 | Next phase: RWA-margin stacking | 8.7% *(projection)* | 0.02% | T-bill margin earns ~5% **while** backing the carry |
 
 **Not claimed:** any real-money track record (the production engine paper-trades),
