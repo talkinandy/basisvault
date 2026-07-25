@@ -199,13 +199,29 @@ a{color:inherit;text-decoration:none}
 .acc-next{border:1.5px dashed var(--line2);border-radius:14px;background:rgba(244,169,60,.05);
   padding:12px 16px;margin:2px 0 10px}
 .acc-next .tag{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.08em;
-  color:#9A6A1B;background:rgba(244,169,60,.18);border-radius:999px;padding:3px 10px;margin-bottom:8px}
-.acc-next .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:8px 22px}
-.acc-next .it{font-size:12px;color:var(--muted);line-height:1.55}
-.acc-next .it b{color:var(--ink)}
-.acc-next .it .gold{color:#9A6A1B;font-weight:800}
-.acc-next .goldbar{display:inline-block;width:54px;height:7px;border-radius:4px;vertical-align:1px;
-  background:linear-gradient(90deg,#F4A93C 0 62%,rgba(244,169,60,.25) 62%);margin:0 4px}
+  color:#9A6A1B;background:rgba(244,169,60,.18);border-radius:999px;padding:3px 10px;margin-bottom:4px}
+.acc-next .minigrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin-top:8px}
+.acc-mini{border:1.5px dashed rgba(154,106,27,.4);border-radius:12px;padding:10px 12px;background:rgba(255,255,255,.7)}
+.acc-mini .ttl{font-weight:800;font-size:12.5px;color:#9A6A1B;margin-bottom:8px}
+.acc-mini .acc-legs{gap:8px}
+.acc-mini .acc-leg{padding:8px 10px;font-size:10.5px;line-height:1.45}
+.acc-mini .acc-leg .t{font-size:11px}
+.acc-mini .acc-leg .n{font-size:14px;margin:1px 0}
+.acc-mini .acc-mid{min-width:52px}
+.acc-mini .acc-mid .d{font-size:15px}
+.acc-leg.ghost{background:rgba(244,169,60,.08);border:1.5px dashed rgba(154,106,27,.55);color:#9A6A1B}
+.acc-leg.ghost .acc-bar{background:rgba(154,106,27,.15)}
+.acc-leg.ghost .acc-fill{background:#C9942F;width:100%}
+.pillb{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.05em;border-radius:999px;padding:2px 7px;margin-left:5px;vertical-align:1px}
+.pillb.live{background:var(--greensoft);color:var(--green)}
+.pillb.soon{background:rgba(244,169,60,.2);color:#9A6A1B}
+.acc-mini .acc-flow{margin-top:9px;font-size:10.5px}
+.nav.gold{background:rgba(244,169,60,.14);color:#9A6A1B;border-color:#C9942F}
+.mrow{display:flex;align-items:center;gap:8px;font-size:10.5px;font-weight:700;color:var(--muted);margin:7px 0}
+.mrow .lab{width:132px;flex:none}
+.mrow .mtrack{flex:1;height:9px;border-radius:5px;background:#EEE7DA;overflow:hidden}
+.mrow .mfill{display:block;height:100%;border-radius:5px}
+.mrow .val{width:56px;flex:none;text-align:right;font-family:'IBM Plex Mono';font-size:10.5px}
 @keyframes fc-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 /* stacking */
 .stackgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:26px}
@@ -537,10 +553,14 @@ function renderLC(s){
   const ledgerPill=lg.live
     ?`<div class="m"><div class="v" style="color:var(--canton);font-size:15px">⛓ live Canton ledger</div><div class="l">${lg.visibleContracts??0} contract(s) visible to this role — enforced by the ledger, not the UI · ${lg.participant||''}</div></div>`
     :`<div class="m"><div class="v" style="color:var(--faint);font-size:15px">mock driver</div><div class="l">sandbox offline — same workflow, simulated</div></div>`;
+  const yieldBase=m.aumUsd-m.accruedUsd;
+  const yieldVal=m.accruedUsd>0&&yieldBase>0
+    ?`${fmtUsd(m.accruedUsd)} <span style="font-size:13px;color:var(--green)">≈ ${(m.accruedUsd*4/yieldBase*100).toFixed(1)}%/yr</span>`
+    :fmtUsd(m.accruedUsd);
   $('#lc-strip').innerHTML=[
     ['Vault AUM',fmtUsd(m.aumUsd)],['NAV / share',m.navPerShare.toFixed(4)],
     ['Alice holds',fmtUsd(m.aliceUsd)],['Bob holds',fmtUsd(m.bobUsd)],
-    ['Yield realized',fmtUsd(m.accruedUsd)]
+    ['Yield realized',yieldVal]
   ].map(([l,v])=>`<div class="m"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('')+ledgerPill;
   let feed='';
   if(s.role==='outsider'){
@@ -591,25 +611,53 @@ function renderAccrual(a){
         <span class="dashwrap"></span>
         <span>funding ${x.aprPct.toFixed(1)}%/yr into the SHORT leg</span>
         <span class="dashwrap"></span>
-        <span class="nav">NAV +$${Math.round(x.earnedUsd).toLocaleString()}</span>
+        <span class="nav">NAV +$${Math.round(x.earnedUsd).toLocaleString()} · ${(x.earnedUsd*4/(x.notionalUsd+x.marginUsd)*100).toFixed(1)}%/yr on capital</span>
       </div>
       <div class="acc-formula">${fmtUsd(x.notionalUsd)} × ${x.aprPct.toFixed(1)}% × 0.25y — trailing-30d Hyperliquid rate, oracle-marked, realized only</div>
     </div>`;
   }).join('');
+  const totalCap=a.perPairCapitalUsd*a.assets.length;
+  const vaultApy=(a.totalEarnedUsd*4/totalCap*100).toFixed(1);
   el.innerHTML=`<div class="acc-grid">${cards}</div>
     <div class="acc-foot">one pair deploys ${fmtUsd(a.perPairCapitalUsd)} (${fmtUsd(a.assets[0].notionalUsd)} spot + ${fmtUsd(a.assets[0].marginUsd)} margin)
-    → ${Math.round(a.capitalEfficiencyPct)}% of capital earning · total this quarter: +$${Math.round(a.totalEarnedUsd).toLocaleString()}</div>
+    → ${Math.round(a.capitalEfficiencyPct)}% of capital earning · total this quarter: +$${Math.round(a.totalEarnedUsd).toLocaleString()} ≈ <b>${vaultApy}%/yr</b> on deployed capital</div>
     <div class="acc-next">
       <span class="tag">NEXT PHASE · SAME SEAMS · NOT PART OF THIS RUN</span>
-      <div class="row">
-        <div class="it"><span class="gold">🥇 Third pair: gold.</span> The short leg is <b>live today</b> —
-          Hyperliquid's XAU perp (<b>$168M</b> open interest; <b>6.8% APY</b> backtested on its full 7-month
-          funding history, same rules). Waiting only on the long leg: the <b>DBS tokenized gold</b> token
-          on Canton (H2&nbsp;2026).</div>
-        <div class="it"><span class="gold">Margin that earns (RWA).</span> Today the USDCx margin earns 0% —
-          like every crypto venue. Next: <b>tokenized T-bill margin</b><span class="goldbar"></span>earns
-          <b>~5.2%/yr while it backs the carry</b> (DTCC tokenized Treasuries, Oct&nbsp;2026) — backtested
-          carry sleeve <b>11.6%/yr</b> over 5y. An edge no venue with dead margin can copy.</div>
+      <div class="minigrid">
+        <div class="acc-mini">
+          <div class="ttl">🥇 Third pair: gold — the short leg already exists</div>
+          <div class="acc-legs">
+            <div class="acc-leg ghost">
+              <div class="t">LONG DBS gold token · Canton<span class="pillb soon">H2 2026</span></div>
+              <div class="n">tokenized XAU</div>
+              <div class="acc-bar"><span class="acc-fill"></span></div>
+              <div class="s">1g = 1 token, DBS vault — the missing leg</div>
+            </div>
+            <div class="acc-mid">
+              <div class="arrows">+Δ → ← −Δ</div>
+              <div class="d">Δ = 0</div>
+            </div>
+            <div class="acc-leg short">
+              <div class="t">SHORT XAU perp · Hyperliquid<span class="pillb live">LIVE</span></div>
+              <div class="n">$168M OI</div>
+              <div class="acc-bar"><span class="acc-fill" style="width:20%"></span></div>
+              <div class="s">avg funding 8.9%/yr — 7 months of real prints</div>
+            </div>
+          </div>
+          <div class="acc-flow">
+            <span>same rules, backtested</span>
+            <span class="dashwrap"></span>
+            <span class="nav gold">6.8%/yr · 0.16% maxDD</span>
+          </div>
+        </div>
+        <div class="acc-mini">
+          <div class="ttl">Margin that earns (RWA) — the stacking edge</div>
+          <div class="mrow"><span class="lab">today: USDCx margin</span><span class="mtrack"><span class="mfill" style="width:2%;background:#B9AE9C"></span></span><span class="val">0%/yr</span></div>
+          <div class="mrow"><span class="lab">next: T-bill margin</span><span class="mtrack"><span class="mfill" style="width:47%;background:#F4A93C"></span></span><span class="val">5.2%/yr</span></div>
+          <div class="mrow"><span class="lab">+ funding carry</span><span class="mtrack"><span class="mfill" style="width:91%;background:var(--canton)"></span></span><span class="val">10.0%/yr</span></div>
+          <div class="mrow" style="font-weight:800;color:var(--ink)"><span class="lab">= carry sleeve</span><span class="mtrack"><span class="mfill" style="width:100%;background:linear-gradient(90deg,#F4A93C,var(--canton))"></span></span><span class="val">11.6%/yr</span></div>
+          <div class="acc-formula">5y backtest · DTCC tokenized Treasuries land Oct 2026 · margin earning while it backs the carry — the edge every 0%-margin venue lacks</div>
+        </div>
       </div>
     </div>`;
 }
