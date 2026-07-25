@@ -119,6 +119,24 @@ class LedgerBridge:
         self.label = LABEL
         self.party: dict[str, str] = {}
         self._ready = False
+        # "on the wire": the last raw JSON Ledger API exchanges (proof the demo
+        # is real traffic, not a facade) — rendered by the UI's terminal panel
+        self.wire: list[dict] = []
+
+    def _record(self, method: str, path: str, request: Any, status: int,
+                response: Any, ms: int) -> None:
+        import time as _t
+
+        def _trunc(x: Any, n: int) -> str:
+            s = x if isinstance(x, str) else __import__("json").dumps(x, separators=(",", ":"))
+            return s if len(s) <= n else s[:n] + f"… (+{len(s)-n} chars)"
+
+        self.wire.append({
+            "time": _t.strftime("%H:%M:%S UTC", _t.gmtime()),
+            "method": method, "path": path, "status": status, "ms": ms,
+            "request": _trunc(request, 900), "response": _trunc(response, 600),
+        })
+        del self.wire[:-10]
 
     # ---------- bootstrap ----------
     def ensure(self) -> bool:
@@ -220,13 +238,23 @@ class LedgerBridge:
     def find(self, hint: str, entity: str) -> list[dict]:
         return [c for c in self.acs(hint) if c["entity"] == entity]
 
-    def vault_cid(self) -> str | None:
+    def _pick_vault(self) -> dict | None:
+        """Deterministic vault choice: the funded one wins (a stray empty vault
+        can survive a reset race on a shared node); ties break on contract id
+        so every query in a step agrees on the same vault."""
         vs = self.find("operator", "Vault")
-        return vs[0]["cid"] if vs else None
+        if not vs:
+            return None
+        return max(vs, key=lambda v: (float(v["arg"].get("totalShares", 0) or 0),
+                                      float(v["arg"].get("totalAssets", 0) or 0),
+                                      v["cid"]))
+
+    def vault_cid(self) -> str | None:
+        v = self._pick_vault()
+        return v["cid"] if v else None
 
     def vault(self) -> dict | None:
-        vs = self.find("operator", "Vault")
-        return vs[0] if vs else None
+        return self._pick_vault()
 
     # ---------- writes ----------
     def submit(self, act_as: list[str], commands: list[dict]) -> dict:
@@ -245,8 +273,13 @@ class LedgerBridge:
                     "verbose": False},
                 "transactionShape": "TRANSACTION_SHAPE_ACS_DELTA"},
         }
+        import time as _t
+        t0 = _t.monotonic()
         r = self._http.post("/v2/commands/submit-and-wait-for-transaction", json=body)
+        ms = int((_t.monotonic() - t0) * 1000)
         if r.status_code != 200:
+            self._record("POST", "/v2/commands/submit-and-wait-for-transaction",
+                         body, r.status_code, r.text, ms)
             raise RuntimeError(f"submit failed [{r.status_code}]: {r.text[:300]}")
         tx = r.json()["transaction"]
         created = []
@@ -256,6 +289,11 @@ class LedgerBridge:
                 created.append({"entity": ce["templateId"].rsplit(":", 1)[1],
                                 "cid": ce["contractId"],
                                 "arg": ce.get("createArgument", {})})
+        self._record("POST", "/v2/commands/submit-and-wait-for-transaction",
+                     body, 200,
+                     {"updateId": tx["updateId"], "offset": tx.get("offset"),
+                      "recordTime": tx.get("recordTime"),
+                      "created": [c["entity"] for c in created]}, ms)
         return {"updateId": tx["updateId"], "created": created}
 
     def create(self, act_as: str, entity: str, args: dict, module: str = "BasisVault.Vault") -> dict:
@@ -319,3 +357,11 @@ class LedgerBridge:
             if leftovers == 0:
                 break
         self.create_vault()
+        # collapse any duplicate vaults (e.g. from a concurrent reset race)
+        keep = self.vault_cid()
+        for v in self.find("operator", "Vault"):
+            if v["cid"] != keep:
+                try:
+                    self.exercise("operator", "Vault", v["cid"], "Archive")
+                except Exception as e:
+                    log.warning("duplicate vault archive failed: %s", e)

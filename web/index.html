@@ -150,6 +150,21 @@ a{color:inherit;text-decoration:none}
 .lc-ev .daml{font-family:'IBM Plex Mono';font-size:11.5px;color:var(--canton);margin-top:6px;font-weight:600}
 .lc-hidden{font-size:12.5px;font-weight:700;color:var(--faint);border:1.5px dashed var(--line2);border-radius:12px;padding:10px 14px;text-align:center}
 .lc-empty{color:var(--faint);font-size:14px;text-align:center;padding:26px 0}
+.lc-busy{position:relative;pointer-events:none;opacity:.75}
+.lc-busy::after{content:"";display:inline-block;width:12px;height:12px;margin-left:9px;vertical-align:-1px;
+  border:2px solid rgba(128,128,128,.35);border-top-color:currentColor;border-radius:50%;animation:lc-spin .7s linear infinite}
+@keyframes lc-spin{to{transform:rotate(360deg)}}
+.lc-wiretop{display:flex;align-items:center;gap:10px;margin-top:18px}
+.lc-wiretop .h3{font-size:14px}
+.lc-wiretop .live{width:8px;height:8px;border-radius:50%;background:var(--green);animation:lc-pulse 1.6s ease infinite}
+@keyframes lc-pulse{50%{opacity:.35}}
+.lc-wire{margin-top:8px;background:#14212B;border-radius:12px;border:1px solid #253745;
+  font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:1.65;color:#B8C9C7;
+  padding:14px 16px;max-height:300px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+.lc-wire .req{color:#F4C07A}
+.lc-wire .res{color:#7BD8A8}
+.lc-wire .meta{color:#5C7382}
+.lc-wire .err{color:#F08A7A}
 @keyframes fc-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 /* stacking */
 .stackgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:26px}
@@ -250,6 +265,12 @@ a{color:inherit;text-decoration:none}
     <div class="lc-steps" id="lc-steps"></div>
     <div class="lc-strip" id="lc-strip"></div>
     <div class="lc-feed" id="lc-feed"></div>
+    <div class="lc-wiretop" id="lc-wiretop" style="display:none">
+      <span class="live"></span>
+      <div class="h3">On the wire — raw JSON Ledger API v2 traffic</div>
+      <span class="mono" style="font-size:11.5px;color:var(--faint)">exactly what this page sends to the Canton participant, and what comes back</span>
+    </div>
+    <div class="lc-wire" id="lc-wire" style="display:none"></div>
   </div>
 </div></section>
 
@@ -491,10 +512,39 @@ function renderLC(s){
   $('#lc-feed').innerHTML=feed;
   $('#lc-next').disabled=!s.next;
   $('#lc-next').textContent=s.next?('▶ '+(STEP_LABELS[s.next]||s.next).replace(/^\d · /,'')):'✓ Lifecycle complete';
+  renderWire(s.wire||[]);
 }
-async function lcFetch(url,opts){renderLC(await (await fetch(url,opts)).json());}
-$('#lc-next').onclick=()=>lcFetch('/api/lifecycle/next?role='+lcRole,{method:'POST'});
-$('#lc-reset').onclick=()=>lcFetch('/api/lifecycle/reset?role='+lcRole,{method:'POST'});
+function renderWire(wire){
+  const top=$('#lc-wiretop'), box=$('#lc-wire');
+  if(!wire.length){top.style.display='none';box.style.display='none';return;}
+  top.style.display='flex';box.style.display='block';
+  box.innerHTML=wire.map(w=>{
+    const ok=w.status===200;
+    return `<span class="meta">[${w.time}]</span> <span class="req">→ ${w.method} ${w.path}</span>\n`+
+           `<span class="meta">  body:</span> ${esc(w.request)}\n`+
+           `<span class="${ok?'res':'err'}">← HTTP ${w.status}</span> <span class="meta">(${w.ms} ms)</span> ${esc(w.response)}\n`;
+  }).join('\n');
+  box.scrollTop=box.scrollHeight;
+}
+const esc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+let lcBusy=false;
+async function lcFetch(url,opts,btn){
+  if(lcBusy)return;
+  lcBusy=true;
+  const el=btn&&$(btn);
+  const label=el?el.textContent:'';
+  if(el){el.classList.add('lc-busy');if(btn==='#lc-next')el.textContent='submitting to Canton…';}
+  try{
+    const r=await fetch(url,opts);
+    if(r.status===409){return;}          // another step in flight server-side
+    renderLC(await r.json());
+  }finally{
+    lcBusy=false;
+    if(el){el.classList.remove('lc-busy');if(btn==='#lc-next'&&el.textContent==='submitting to Canton…')el.textContent=label;}
+  }
+}
+$('#lc-next').onclick=()=>lcFetch('/api/lifecycle/next?role='+lcRole,{method:'POST'},'#lc-next');
+$('#lc-reset').onclick=()=>lcFetch('/api/lifecycle/reset?role='+lcRole,{method:'POST'},'#lc-reset');
 document.querySelectorAll('#lc-roles button').forEach(b=>b.onclick=()=>{
   lcRole=b.dataset.r;
   document.querySelectorAll('#lc-roles button').forEach(x=>x.classList.toggle('on',x===b));

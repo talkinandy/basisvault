@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -439,6 +440,10 @@ def _lc_view(role: str) -> dict:
         "events": visible, "hiddenCount": hidden,
         "role": role,
         "ledger": _lc_ledger_info(role),
+        # the raw JSON Ledger API exchanges behind the buttons — same for every
+        # role (it's OUR app's traffic; role privacy applies to ledger reads,
+        # not to showing what the demo itself submitted)
+        "wire": BRIDGE.wire if _LC["mode"] == "ledger" else [],
     }
 
 
@@ -462,34 +467,47 @@ def api_lifecycle(role: str = "observer") -> JSONResponse:
     return JSONResponse(_lc_view(role))
 
 
+_LC_LOCK = threading.Lock()
+
+
 @app.post("/api/lifecycle/next")
 def api_lifecycle_next(role: str = "observer") -> JSONResponse:
-    if _LC["i"] < len(LC_STEPS):
-        step = LC_STEPS[_LC["i"]]
-        if _LC["i"] == 0 and _LC["mode"] != "ledger" and BRIDGE.ensure():
-            _LC["mode"] = "ledger"  # sandbox came up after the app — upgrade
-        if _LC["mode"] == "ledger" and BRIDGE.ensure():
-            try:
-                _lc_run_ledger(step)
-            except Exception as e:
-                return JSONResponse({**_lc_view(role), "ledgerError": str(e)[:300]},
-                                    status_code=502)
-        else:
-            _LC["mode"] = "mock"
-            _lc_run(step)
-        _LC["i"] += 1
-    return JSONResponse(_lc_view(role))
+    if not _LC_LOCK.acquire(blocking=False):
+        return JSONResponse({**_lc_view(role), "busy": True}, status_code=409)
+    try:
+        if _LC["i"] < len(LC_STEPS):
+            step = LC_STEPS[_LC["i"]]
+            if _LC["i"] == 0 and _LC["mode"] != "ledger" and BRIDGE.ensure():
+                _LC["mode"] = "ledger"  # sandbox came up after the app — upgrade
+            if _LC["mode"] == "ledger" and BRIDGE.ensure():
+                try:
+                    _lc_run_ledger(step)
+                except Exception as e:
+                    return JSONResponse({**_lc_view(role), "ledgerError": str(e)[:300]},
+                                        status_code=502)
+            else:
+                _LC["mode"] = "mock"
+                _lc_run(step)
+            _LC["i"] += 1
+        return JSONResponse(_lc_view(role))
+    finally:
+        _LC_LOCK.release()
 
 
 @app.post("/api/lifecycle/reset")
 def api_lifecycle_reset(role: str = "observer") -> JSONResponse:
     global _LC
-    if BRIDGE.ensure():
-        BRIDGE.reset()
-        _LC = _fresh_lc("ledger")
-    else:
-        _LC = _fresh_lc("mock")
-    return JSONResponse(_lc_view(role))
+    if not _LC_LOCK.acquire(blocking=False):
+        return JSONResponse({**_lc_view(role), "busy": True}, status_code=409)
+    try:
+        if BRIDGE.ensure():
+            BRIDGE.reset()
+            _LC = _fresh_lc("ledger")
+        else:
+            _LC = _fresh_lc("mock")
+        return JSONResponse(_lc_view(role))
+    finally:
+        _LC_LOCK.release()
 
 
 @app.get("/", response_class=HTMLResponse)
