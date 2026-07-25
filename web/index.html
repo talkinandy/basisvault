@@ -613,7 +613,7 @@ function renderAccrual(a){
         <span class="dashwrap"></span>
         <span class="nav">NAV +$${Math.round(x.earnedUsd).toLocaleString()} · ${(x.earnedUsd*4/(x.notionalUsd+x.marginUsd)*100).toFixed(1)}%/yr on capital</span>
       </div>
-      <div class="acc-formula">${fmtUsd(x.notionalUsd)} × ${x.aprPct.toFixed(1)}% × 0.25y — trailing-30d Hyperliquid rate, oracle-marked, realized only</div>
+      <div class="acc-formula">${fmtUsd(x.notionalUsd)} × ${x.aprPct.toFixed(1)}% × 0.25y — trailing-7d Hyperliquid rate, oracle-marked, realized only</div>
     </div>`;
   }).join('');
   const totalCap=a.perPairCapitalUsd*a.assets.length;

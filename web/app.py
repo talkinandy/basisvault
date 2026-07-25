@@ -62,8 +62,9 @@ def _pct(x: float) -> float:
 
 
 # ---------- real market inputs (honest, but never load-bearing) ----------
-def _trailing_funding(days: int = 30) -> dict[str, float]:
-    """Trailing annualized HL funding per asset from the committed real data."""
+def _trailing_funding(days: int = 7) -> dict[str, float]:
+    """Trailing annualized HL funding per asset from the committed real data.
+    7d default: closest quotable window to the strategy's 72h decision signal."""
     out = {}
     for u in CARRY_ASSETS:
         try:
@@ -307,7 +308,7 @@ def _lc_run(step: str) -> None:
              "earnedUsd": round(p["notional"] * p["rate"] * 0.25, 2)}
             for p in _LC["positions"]], earned)
         _lc_event(step, f"One quarter of funding accrues: +${earned:,.0f}",
-                  f"realized only — notional × trailing HL funding × 0.25y; NAV/share → {_lc_pps():.4f}",
+                  f"realized only — notional × trailing-7d HL funding × 0.25y; NAV/share → {_lc_pps():.4f}",
                   "Vault_AccrueFunding", ["issuer", "observer"])
         _lc_event(step, "Your holding grew",
                   f"your {_LC['alice']:,.0f} shares are now worth ${_LC['alice']*_lc_pps():,.0f}",
@@ -419,7 +420,7 @@ def _lc_run_ledger(step: str) -> None:
         _LC["accrual"] = _accrual_detail(detail, total)
         _lc_sync_from_ledger()
         _lc_event(step, f"One quarter of funding accrues: +${total:,.0f}",
-                  f"realized only — notional × trailing HL funding × 0.25y; NAV/share → {_lc_pps():.4f}",
+                  f"realized only — notional × trailing-7d HL funding × 0.25y; NAV/share → {_lc_pps():.4f}",
                   "Vault_AccrueFunding", ["issuer", "observer"], last_up)
         _lc_event(step, "Your holding grew",
                   f"your {_LC['alice']:,.0f} shares are now worth ${_LC['alice']*_lc_pps():,.0f}",

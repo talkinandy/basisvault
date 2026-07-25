@@ -140,9 +140,9 @@ appear.
 > notional margined by just **80k at 5×** — you can *see* the leverage, that's
 > the one-fifth-filled bar. And the only thing that moves NAV is this —"
 > *(trace the animated funding flow)* "— funding paid by leveraged longs at
-> the **real trailing Hyperliquid rate**: $8,861 on BTC this quarter — **7.4%
-> a year on the pair's capital**, and the strip up top annualizes the whole
-> vault at ~6.7%. Realized only — the template cannot book yield that wasn't
+> the **real trailing-7-day Hyperliquid rate**: $8,476 on BTC this quarter —
+> **7.1% a year on the pair's capital**, ETH even richer at 8.3% — and the
+> strip up top annualizes the whole vault at ~7.4%. Realized only — the template cannot book yield that wasn't
 > received.
 >
 > And below, in gold, clearly marked *not part of this run* — the roadmap in
@@ -174,7 +174,7 @@ Click through **Transfer**, **Unwind**, **Redeem**.
 > "Shares are transferable Daml holdings — Alice's position moves to Bob,
 > propose-accept-settle. The sign guard unwinds both legs — the short never
 > pays through a negative regime. And Bob redeems at the higher NAV:
-> **$1,016,760 out**. Vault empty, books exact."
+> **$1,018,456 out**. Vault empty, books exact."
 
 **[2:35–3:00 · Honest numbers + close]**
 Scroll to the backtest section.
