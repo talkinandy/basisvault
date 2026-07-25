@@ -142,7 +142,12 @@ Click **▶ Accrue funding**; the two anatomy cards appear.
 > by leveraged longs, at the **real trailing Hyperliquid rate**, marked to an
 > oracle feed: 400k × 7.9% × a quarter = **$7,933 on BTC**, $6,515 on ETH.
 > NAV per share just went from 1.0000 to 1.0144. Realized only — the template
-> cannot book yield that wasn't received."
+> cannot book yield that wasn't received. And below — clearly marked as *next
+> phase*, not this run — the same seams take a **third pair, gold**: the short
+> leg is live on Hyperliquid today with 168 million of open interest, waiting
+> only for the DBS gold token. And the margin upgrade: tokenized T-bills that
+> **earn five percent while backing the carry** — dead margin is what every
+> crypto venue charges; Canton removes it."
 
 **[1:35–2:10 · The privacy flip — three sets of eyes]**
 Flip role tabs: **Issuer → Holder → Outsider**, ending back on Observer.
