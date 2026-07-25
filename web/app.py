@@ -351,6 +351,11 @@ def _lc_run_ledger(step: str) -> None:
     br = BRIDGE
     funding = _trailing_funding()
     if step == "deposit":
+        v = br.vault()
+        if v and float(v["arg"]["totalShares"]) > 0:
+            # leftover state from a previous run (e.g. service restart without
+            # reset) — sweep it so the demo numbers always start from zero
+            br.reset()
         r1 = br.create("alice", "DepositRequest", {
             "operator": br.party["operator"], "investor": br.party["alice"],
             "amount": f"{_DEMO_AUM:.1f}", "vaultCid": br.vault_cid()})
