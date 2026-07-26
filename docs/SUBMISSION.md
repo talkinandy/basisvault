@@ -110,83 +110,74 @@ the lifecycle panel fills the frame. Every claim below is on-screen — no slide
 
 ---
 
-**[0:00–0:20 · Hook — the badge]**
-> "Leveraged traders pay rent every hour to hold their positions. BasisYield
-> collects it: short the BTC/ETH perp on Hyperliquid, long cBTC and cETH in
-> Canton custody — price risk cancels, funding remains. And this is not a
-> simulation —" *(point at the badge)* "— everything you're about to see
-> executes on **Canton DevNet**, on the network's own validator."
+**[0:00–0:25 · The hook — a strange fact, no product yet]**
+Nothing clicked yet; just the hero on screen.
+> "Here's a strange fact about crypto markets: every single hour, traders who
+> borrow money to bet on Bitcoin pay a fee for the privilege. Not sometimes —
+> every hour, around the clock. Over the last three years that fee has averaged
+> **fourteen percent a year**. Somebody gets to collect it. Almost nobody does —
+> because collecting it safely means holding two opposite positions at once, on
+> two different systems, without anyone seeing your book. That's what we built."
 
-**[0:20–0:40 · Step 1 — Deposit]**
-Click **▶ Deposit**; let the *"submitting to Canton…"* spinner be visible.
-> "Alice deposits a million USDCx. Watch the button — that's a real ~2-second
-> round trip to the participant, and here's the transaction id the ledger
-> returned." *(scroll briefly to the **On-the-wire panel**)* "This panel is the
-> raw JSON Ledger API traffic — the exact command we sent, and Canton's
-> response: update id, offset, record time. No facade."
+**[0:25–0:45 · What it is, in plain words]**
+> "BasisYield is a vault on the Canton Network. You put dollars in; it collects
+> that hourly fee — think of it as **rent** — and your share grows. No price
+> bets: the vault owns Bitcoin and bets *against* Bitcoin at the same time, so
+> whether the price goes up or down, the moves cancel and the rent is all
+> that's left. Let me show you — and everything you're about to see is running
+> **live on Canton's DevNet**" *(point at the badge)* "— not a mockup."
 
-**[0:40–1:00 · Step 2 — Open carry]**
-Click **▶ Open carry**.
-> "The strategy engine proposes two pairs — it can only *propose*; the
-> custodian approves. Both open at **live Hyperliquid mid marks**, and the
-> net-delta-zero hedge isn't a policy — it's **asserted in the Daml template**.
-> If the legs don't cancel, the transaction fails."
+**[0:45–1:05 · Step 1 — an investor puts money in]**
+Click **▶ Deposit**; let the spinner breathe.
+> "An investor — Alice — puts in one million digital dollars. That little
+> spinner is a real two-second round trip to the Canton network, and this is
+> the receipt the ledger sent back." *(flash the On-the-wire panel)* "For the
+> technical judges: that panel is the raw API traffic. Every number on this
+> page comes from a real transaction."
 
-**[1:00–1:45 · Step 3 — Accrue + the anatomy cards (centerpiece)]**
-Click **▶ Accrue funding**; the two anatomy cards + the gold next-phase strip
-appear.
-> "Here's why this is yield and not a bet. Left leg: spot cBTC in Canton
-> custody — earns nothing, cancels price. Right leg: the short perp — 400k of
-> notional margined by just **80k at 5×** — you can *see* the leverage, that's
-> the one-fifth-filled bar. And the only thing that moves NAV is this —"
-> *(trace the animated funding flow)* "— funding paid by leveraged longs at
-> the **real trailing-7-day Hyperliquid rate**: $8,476 on BTC this quarter —
-> **7.1% a year on the pair's capital**, ETH even richer at 8.3% — and the
-> strip up top annualizes the whole vault at ~7.4%. Realized only — the template cannot book yield that wasn't
-> received.
->
-> And below, in gold, clearly marked *not part of this run* — the roadmap in
-> the same picture-language. **The third pair: gold.** See the two legs? The
-> short leg is **solid — it's live today**: Hyperliquid's XAU perp, 168
-> million of open interest, 6.8% a year backtested on its entire funding
-> history. The long leg is **dashed** — the DBS gold token, H2 2026. One leg
-> exists; we're waiting on the other. And next to it, the RWA upgrade as four
-> bars: today's margin earns **zero**, like every crypto venue — tokenized
-> T-bill margin earns **5.2% while backing the carry**, stack the funding on
-> top and the sleeve backtests at **11.6%**. Dead margin is a fee; Canton
-> removes it."
+**[1:05–1:50 · Steps 2–3 — the machine, shown not told (centerpiece)]**
+Click **▶ Open carry**, then **▶ Accrue funding**; the anatomy cards appear.
+> "Here's the machine. Left box: the vault holds real Bitcoin — as cBTC, in
+> Canton custody. Right box: an equal-sized bet *against* Bitcoin on
+> Hyperliquid, the biggest venue for these bets. Price moves cancel — and the
+> ledger itself **refuses the trade** if the two sides don't match. Now watch
+> the money: leveraged traders pay their hourly rent straight into our
+> position — this week it's running about **8% a year on Bitcoin, 10% on
+> Ethereum** — and a quarter's worth just landed: **eighteen and a half
+> thousand dollars**, share price up. Only money actually *received* counts;
+> the rules are code — the vault cannot invent yield. And this gold preview
+> below, marked *not part of this run*: that's what plugs in next. **Gold** —
+> the betting side already exists today — and **Treasury-bill margin that
+> earns while it works**."
 
-**[1:45–2:15 · The privacy flip — three sets of eyes]**
-Flip role tabs: **Issuer → Holder → Outsider**, ending back on Observer.
-> "Same vault, three sets of eyes — and the contract counts you see are
-> **Canton's own answers**, per party, from the ledger's active-contract set —
-> not UI filtering. The issuer sees everything it signs. The **holder** —"
-> *(pause on Holder)* "— always knows the mandate; it's public and the
-> accounting rules are on-chain. What's confidential is only the live blotter,
-> because a visible delta-neutral book gets traded against — and it's not
-> hidden from everyone: **the fund auditor sees it live**, on the holder's
-> behalf. The **outsider** sees zero contracts. This is the thing a
-> transparent chain cannot do, and it's why this strategy can exist on-chain
-> at all."
+**[1:50–2:25 · The privacy story — three sets of eyes]**
+Flip role tabs: **Issuer → Holder → Outsider**, end on Observer.
+> "Now the part that makes Canton the only place this can live. A fund's
+> positions are like a poker hand — show them, and you get played. So: three
+> sets of eyes. The operator sees everything it signs. The **investor** —"
+> *(Holder tab)* "— always knows the strategy and their own money, and their
+> **auditor watches the entire book, live, on their behalf**. And a
+> stranger —" *(Outsider tab)* "— sees zero. Literally zero contracts — and
+> that number comes from the network itself, not from our website. Public
+> blockchains cannot do this. It's why this strategy has never lived on-chain
+> before."
 
-**[2:15–2:35 · Steps 4–6 — Transfer, unwind, redeem]**
-Click through **Transfer**, **Unwind**, **Redeem**.
-> "Shares are transferable Daml holdings — Alice's position moves to Bob,
-> propose-accept-settle. The sign guard unwinds both legs — the short never
-> pays through a negative regime. And Bob redeems at the higher NAV:
-> **$1,018,456 out**. Vault empty, books exact."
+**[2:25–2:45 · Steps 4–6 — hands change, vault steps out, cash out]**
+Click **Transfer**, **Unwind**, **Redeem**.
+> "Shares can change hands — Alice passes hers to Bob, peer to peer. When the
+> rent dries up, the vault automatically steps out of the trade — it never
+> pays rent in reverse. And Bob cashes out: **one million eighteen thousand**
+> — the deposit plus the rent, exact to the cent."
 
-**[2:35–3:00 · Honest numbers + close]**
-Scroll to the backtest section.
-> "The full numbers: our production rules replayed over **every hourly
-> funding print Hyperliquid has ever paid** — 3.2 years, both assets:
-> **12.2% APY, 0.21% max drawdown**, rolling one-year range 4.5 to 22.6 —
-> and today's compressed regime is the *bottom* of that range; we say so on
-> the page. This is the live basisyield.com engine brought on-chain, with
-> gold and RWA margin already validated behind the same seams. Leveraged
-> traders pay rent every hour. Now there's an auditable place to collect it."
-
----
+**[2:45–3:00 · Close — the honest numbers]**
+Scroll briefly across the backtest + rent-through-time chart.
+> "Three point two years of real data — every hourly payment this market has
+> ever made — says this earns about **12% a year** with almost no downside
+> wobble. Some years four, some years twenty-two; we publish the whole range,
+> and here's the rent through time for every asset, including the two we
+> haven't switched on yet. It's the engine we already run at basisyield.com,
+> moved on-chain. Leveraged traders pay rent every hour. Now there's a place
+> to collect it — **with an audit trail**."
 
 Fallback: if DevNet hiccups mid-recording, `systemctl revert
 basisvault-dashboard && systemctl restart basisvault-dashboard` flips to the
