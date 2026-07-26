@@ -400,14 +400,16 @@ a{color:inherit;text-decoration:none}
         <div class="bt-stat"><div class="v green" id="bt-apy">—</div><div class="l">3.2-yr blended APY</div></div>
         <div class="bt-stat"><div class="v" id="bt-dd">—</div><div class="l">Max drawdown</div></div>
         <div class="bt-stat"><div class="v" id="bt-range">—</div><div class="l">Rolling-1y range</div></div>
-        <div class="bt-stat"><div class="v" id="bt-today">—</div><div class="l">Today (trailing 1y)</div></div>
+        <div class="bt-stat"><div class="v" id="bt-today">—</div><div class="l">Now — trailing 7d, net</div></div>
       </div>
       <p class="note">Non-lookahead replay of the production entry/exit rules on <b>every hourly
         funding print Hyperliquid has ever paid</b> for BTC and ETH: decide on the trailing 3-day
         window, accrue the next print, pay both-legs costs on every open and unwind, and never hold
         through a negative regime (sign guard). Perp leverage capped at 5× by the liquidation
         buffer — <b>realized funding only</b>. The range is every rolling year in the data,
-        worst to best — today's compressed regime sits at the bottom of it.</p>
+        worst to best — the trailing <i>year</i> (≈4.5%) sits at the bottom of it, while the
+        last 7 days run richer: funding is regime-dependent, which is the whole point of
+        quoting a range.</p>
     </div>
   </div>
 </div></section>
@@ -571,7 +573,7 @@ function renderCarry(c, st, ov){
   $('#bt-apy').textContent=pct(c.apyPct);
   $('#bt-dd').textContent=pct(c.maxDrawdownPct);
   $('#bt-range').textContent=`${(c.lowPct||0).toFixed(1)}–${(c.highPct||0).toFixed(1)}%`;
-  $('#bt-today').textContent='~'+(c.todayPct||0).toFixed(1)+'%';
+  $('#bt-today').textContent='~'+(((ov||{}).currentYieldPct)??c.todayPct??0).toFixed(1)+'%';
   $('#bt-source').textContent=c.source||'';
   chart(c.navCurve, c.navStart);
 }
