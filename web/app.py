@@ -100,6 +100,62 @@ def _hl_marks() -> dict[str, float]:
         return cached or {"CBTC": 118_000.0, "CETH": 4_200.0}
 
 
+_fh_cache: dict | None = None
+
+
+def _funding_history() -> dict:
+    """Rolling-30d annualized funding through time, per asset — solid = assets
+    the vault deploys today (BTC/ETH), dashed = next phase (gold perp funding;
+    T-bill rate = the future RWA margin yield). Computed once from the
+    committed datasets."""
+    global _fh_cache
+    if _fh_cache is not None:
+        return _fh_cache
+    import bisect
+    YR = 365 * 24 * 3600 * 1000
+    series = []
+
+    def roll(rows: list[dict], name: str, live: bool) -> None:
+        if len(rows) < 10:
+            return
+        ts = [r["time"] for r in rows]
+        pref = [0.0]
+        for r in rows:
+            pref.append(pref[-1] + r["fundingRate"])
+        win, step = 30 * 86_400_000, 3 * 86_400_000
+        pts = []
+        t = ts[0] + win
+        while t <= ts[-1]:
+            i = bisect.bisect_right(ts, t - win)
+            j = bisect.bisect_right(ts, t)
+            if j - 1 > i and ts[j - 1] > ts[i]:
+                apr = (pref[j] - pref[i]) / ((ts[j - 1] - ts[i]) / YR)
+                pts.append([t, round(apr * 100, 2)])
+            t += step
+        series.append({"name": name, "live": live, "points": pts,
+                       "nowPct": pts[-1][1] if pts else None})
+
+    for fn, name, live in (("hl_btc_funding.json", "BTC funding", True),
+                           ("hl_eth_funding.json", "ETH funding", True),
+                           ("hl_gold_funding.json", "GOLD funding", False)):
+        try:
+            roll(json.loads((_DATA / fn).read_text()), name, live)
+        except Exception:
+            pass
+    try:  # T-bill rate history = what the RWA margin would have earned
+        rows = json.loads((_DATA / "rwa_rates.json").read_text())
+        start = series[0]["points"][0][0] if series and series[0]["points"] else 0
+        pts = [[r["time"], round(r["mmf_rate"] * 100, 2)]
+               for k, r in enumerate(rows) if r["time"] >= start and k % 3 == 0]
+        if pts:
+            series.append({"name": "T-bill (future RWA margin)", "live": False,
+                           "points": pts, "nowPct": pts[-1][1]})
+    except Exception:
+        pass
+    _fh_cache = {"series": series, "window": "rolling 30d, annualized"}
+    return _fh_cache
+
+
 # ---------- backtest payloads ----------
 def _carry() -> dict:
     """THE HERO: cash-and-carry on real Hyperliquid funding (3.2y), short HL
@@ -162,9 +218,10 @@ def state_for(role: str) -> dict:
     blended_now = sum(funding.values()) / len(funding) * CAP_EFF
     overview = {
         "aumUsd": AUM,
-        "currentYieldPct": _pct(blended_now),
+        "currentYieldPct": _pct(blended_now),   # trailing-7d blend × cap-eff
         "carry": _carry(),
         "stacked": _stacked(),
+        "fundingHistory": _funding_history(),
     }
     if role == "outsider":
         book = {"visible": False,

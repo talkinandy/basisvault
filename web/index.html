@@ -274,7 +274,7 @@ a{color:inherit;text-decoration:none}
       </div>
       <div class="statgrid" id="herostats">
         <div class="stat"><div class="v green" id="s-range">—</div><div class="l">Rolling-1y yield range</div><div class="s">market-neutral · regime-dependent</div></div>
-        <div class="stat"><div class="v" id="s-today">—</div><div class="l">Today's regime</div><div class="s">trailing 1y, funding compressed</div></div>
+        <div class="stat"><div class="v" id="s-today">—</div><div class="l">Now — trailing 7d</div><div class="s">net capture at 83% cap-eff</div></div>
         <div class="stat"><div class="v" id="s-avg">—</div><div class="l">3.2-yr APY</div><div class="s">real Hyperliquid funding</div></div>
         <div class="stat"><div class="v" id="s-dd">—</div><div class="l">Max drawdown</div><div class="s">capital-preserving</div></div>
       </div>
@@ -412,6 +412,23 @@ a{color:inherit;text-decoration:none}
   </div>
 </div></section>
 
+<section class="section" id="rates"><div class="wrap">
+  <span class="kicker">The rent, through time</span>
+  <h2 class="h2" style="margin:10px 0 4px">What leveraged longs have been paying.</h2>
+  <p class="lead" style="max-width:64ch">Rolling-30-day annualized funding on every asset behind this
+    vault — <b>solid lines are deployable today</b> (BTC, ETH), <b>dashed is next phase</b>
+    (gold's perp funding — the short leg is already live — and the T-bill rate the future RWA margin
+    would earn on top).</p>
+  <div class="chartcard" style="margin-top:22px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+      <div class="h3">Annualized funding · rolling 30d</div>
+      <div class="mono" style="font-size:12px;color:var(--muted)" id="fr-note"></div>
+    </div>
+    <svg id="fr-chart" viewBox="0 0 640 250" style="width:100%;height:auto;max-height:340px"></svg>
+    <div id="fr-legend" style="display:flex;gap:16px;flex-wrap:wrap;margin-top:10px"></div>
+  </div>
+</div></section>
+
 <section class="section" id="canton"><div class="wrap">
   <span class="kicker" style="color:var(--canton)">Why Canton — today and next</span>
   <h2 class="h2" style="margin:10px 0 4px">Built on what Canton has now. Ready for what ships next.</h2>
@@ -499,10 +516,37 @@ function renderBook(b){
     <p style="color:rgba(255,255,255,.55);font-size:13px;margin-top:6px">${b.note}</p>`;
 }
 
-function renderCarry(c, st){
+const FR_COLORS={'BTC funding':'#E2552E','ETH funding':'#1D6F6A','GOLD funding':'#C9942F','T-bill (future RWA margin)':'#9C9082'};
+function ratesChart(fh){
+  const svg=$('#fr-chart'); if(!fh||!fh.series||!fh.series.length){svg.innerHTML='';return;}
+  const W=640,H=250,padL=34,padR=8,padT=8,padB=20;
+  const CLIP=60, FLOOR=-15;
+  const all=fh.series.flatMap(s=>s.points);
+  const t0=Math.min(...all.map(p=>p[0])), t1=Math.max(...all.map(p=>p[0]));
+  const X=t=>padL+(t-t0)/(t1-t0)*(W-padL-padR);
+  const Y=v=>{const c=Math.max(FLOOR,Math.min(CLIP,v));return padT+(CLIP-c)/(CLIP-FLOOR)*(H-padT-padB);};
+  let g='';
+  [0,15,30,45,60].forEach(v=>{g+=`<line x1="${padL}" y1="${Y(v)}" x2="${W-padR}" y2="${Y(v)}" stroke="${v===0?'#C9BCA6':'#EEE4D4'}" stroke-width="${v===0?1.4:1}"/>
+    <text x="${padL-5}" y="${Y(v)+3.5}" text-anchor="end" font-size="9" fill="#9C9082" font-family="IBM Plex Mono">${v}%</text>`;});
+  for(let yr=2024;yr<=2026;yr++){const t=Date.UTC(yr,0,1); if(t>t0&&t<t1)
+    g+=`<line x1="${X(t)}" y1="${padT}" x2="${X(t)}" y2="${H-padB}" stroke="#F3EADA"/><text x="${X(t)+3}" y="${H-7}" font-size="9" fill="#9C9082" font-family="IBM Plex Mono">${yr}</text>`;}
+  fh.series.forEach(s=>{
+    if(!s.points.length)return;
+    const d=s.points.map((p,i)=>(i?'L':'M')+X(p[0]).toFixed(1)+' '+Y(p[1]).toFixed(1)).join(' ');
+    g+=`<path d="${d}" fill="none" stroke="${FR_COLORS[s.name]||'#888'}" stroke-width="2"
+      ${s.live?'':'stroke-dasharray="5 4"'} stroke-linejoin="round" opacity="${s.live?'1':'.85'}"/>`;
+  });
+  svg.innerHTML=g;
+  $('#fr-legend').innerHTML=fh.series.map(s=>`<span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--muted)">
+    <span style="width:22px;height:0;border-top:3px ${s.live?'solid':'dashed'} ${FR_COLORS[s.name]||'#888'}"></span>
+    ${s.name} <span class="mono" style="color:var(--ink)">${s.nowPct!=null?s.nowPct.toFixed(1)+'%':''}</span>
+    <span style="font-size:10px;font-weight:800;color:${s.live?'var(--green)':'#9A6A1B'}">${s.live?'LIVE NOW':'NEXT PHASE'}</span></span>`).join('');
+  $('#fr-note').textContent=`${fh.window} · spikes clipped at ${CLIP}%`;
+}
+function renderCarry(c, st, ov){
   // hero
   $('#s-range').textContent=`${(c.lowPct||0).toFixed(1)}–${(c.highPct||0).toFixed(1)}%`;
-  $('#s-today').textContent='~'+(c.todayPct||0).toFixed(1)+'%';
+  $('#s-today').textContent='~'+(((ov||{}).currentYieldPct)??c.todayPct??0).toFixed(1)+'%';
   $('#s-avg').textContent=pct(c.apyPct);
   $('#s-dd').textContent=pct(c.maxDrawdownPct);
   // mechanism card
@@ -535,7 +579,8 @@ function renderCarry(c, st){
 async function load(role){
   document.querySelectorAll('#seg button').forEach(x=>x.classList.toggle('on',x.dataset.r===role));
   const s=await (await fetch('/api/state?role='+role)).json();
-  renderCarry(s.overview.carry||{}, s.overview.stacked||{});
+  renderCarry(s.overview.carry||{}, s.overview.stacked||{}, s.overview);
+  ratesChart(s.overview.fundingHistory);
   renderBook(s.book);
 }
 document.querySelectorAll('#seg button').forEach(b=>b.onclick=()=>load(b.dataset.r));
