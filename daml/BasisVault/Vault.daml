@@ -28,6 +28,8 @@ template Vault
     operator : Party
     manager : Party
     auditor : Party
+    vaultId : Text        -- stable identity: survives consuming choices, binds
+                          -- every position/allocation to THIS vault
     underlying : Underlying
     totalAssets : Decimal   -- NAV in quote units
     totalShares : Decimal
@@ -80,7 +82,7 @@ template Vault
       controller manager
       do
         create RebalanceProposal with
-          operator; manager; auditor; vaultCid = self; plan
+          operator; manager; auditor; vaultCid = self; vaultId; plan
 
     -- update status: mark REALIZED funding received by the short leg at the
     -- oracle funding-rate feed and credit it to NAV. Repeatable; no phantom
@@ -96,6 +98,7 @@ template Vault
       controller operator
       do
         pos <- fetch positionCid
+        assertMsg "position must belong to THIS vault" (pos.vaultId == vaultId)
         feed <- fetch rateFeedCid
         assertMsg "funding feed must be a Basis-kind rate" (feed.kind == Basis)
         assertMsg "yearFraction must be in (0, 1]"
@@ -113,7 +116,10 @@ template Vault
       with
         positionCid : ContractId DeltaNeutralPosition
       controller operator
-      do exercise positionCid DeltaNeutralPosition_Unwind
+      do
+        pos <- fetch positionCid
+        assertMsg "position must belong to THIS vault" (pos.vaultId == vaultId)
+        exercise positionCid DeltaNeutralPosition_Unwind
 
     -- === RWA yield-source allocation workflow (NEXT PHASE) ===
     -- As tokenized RWAs ship on Canton (DBS gold, Treasury repo, MMFs) the
@@ -126,7 +132,7 @@ template Vault
       controller manager
       do
         create AllocationProposal with
-          operator; manager; auditor; vaultCid = self; plan
+          operator; manager; auditor; vaultCid = self; vaultId; plan
 
     -- update status: mark realized yield on an allocation at the oracle rate and
     -- credit it to NAV. Repeatable; no phantom yield (only what `yearFraction`
@@ -139,6 +145,7 @@ template Vault
       controller operator
       do
         alloc <- fetch allocationCid
+        assertMsg "allocation must belong to THIS vault" (alloc.vaultId == vaultId)
         feed <- fetch rateFeedCid
         assertMsg "rate feed must match the allocation"
           (feed.kind == alloc.kind && feed.asset == alloc.asset)
@@ -279,6 +286,7 @@ template RebalanceProposal
     manager : Party
     auditor : Party
     vaultCid : ContractId Vault
+    vaultId : Text
     plan : RebalancePlan
   where
     signatory manager
@@ -315,7 +323,7 @@ template RebalanceProposal
           side = Long; notional = longNotional; entryPrice = feed.price
 
         create DeltaNeutralPosition with
-          operator; manager; auditor
+          operator; manager; auditor; vaultId
           underlying = plan.underlying
           shortLeg; longLeg
           shortNotional; longNotional
@@ -336,6 +344,7 @@ template AllocationProposal
     manager : Party
     auditor : Party
     vaultCid : ContractId Vault
+    vaultId : Text
     plan : AllocationPlan
   where
     signatory manager
@@ -350,7 +359,7 @@ template AllocationProposal
         assertMsg "rate feed must match the plan"
           (feed.kind == plan.kind && feed.asset == plan.asset)
         create Allocation with
-          operator; manager; auditor
+          operator; manager; auditor; vaultId
           kind = plan.kind; asset = plan.asset
           principal = plan.principal
           annualizedRate = feed.annualizedRate

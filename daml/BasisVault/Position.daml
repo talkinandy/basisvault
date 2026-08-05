@@ -16,6 +16,7 @@ template DeltaNeutralPosition
     operator : Party
     manager : Party
     auditor : Party
+    vaultId : Text                   -- bound to the vault that opened it
     underlying : Underlying
     shortLeg : ContractId VenueLeg   -- PerpSwap leg (receives funding)
     longLeg : ContractId VenueLeg    -- Helvet/spot leg (cancels price)

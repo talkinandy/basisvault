@@ -38,7 +38,7 @@ testDepositRedeem = do
   vault <- submit p.operator do
     createCmd Vault with
       operator = p.operator; manager = p.manager; auditor = p.auditor
-      underlying = CBTC; totalAssets = 0.0; totalShares = 0.0
+      vaultId = "vault-main"; underlying = CBTC; totalAssets = 0.0; totalShares = 0.0
 
   -- Alice deposits 1000; operator accepts.
   depReq <- submit p.alice do
@@ -74,7 +74,7 @@ testPrivacy = do
   vault <- submit p.operator do
     createCmd Vault with
       operator = p.operator; manager = p.manager; auditor = p.auditor
-      underlying = CBTC; totalAssets = 0.0; totalShares = 0.0
+      vaultId = "vault-main"; underlying = CBTC; totalAssets = 0.0; totalShares = 0.0
   depReq <- submit p.alice do
     createCmd DepositRequest with
       operator = p.operator; investor = p.alice; amount = 1000.0; vaultCid = vault
@@ -107,7 +107,7 @@ testRebalance = do
   vault0 <- submit p.operator do
     createCmd Vault with
       operator = p.operator; manager = p.manager; auditor = p.auditor
-      underlying = CBTC; totalAssets = 1000000.0; totalShares = 1000000.0
+      vaultId = "vault-main"; underlying = CBTC; totalAssets = 1000000.0; totalShares = 1000000.0
 
   -- oracle publishes a cBTC mark (Chainlink ships cBTC feeds on Canton).
   feed <- submit p.oracle do
@@ -183,7 +183,7 @@ testCarryTwoAssets = do
   vault <- submit p.operator do
     createCmd Vault with
       operator = p.operator; manager = p.manager; auditor = p.auditor
-      underlying = CBTC; totalAssets = 1000000.0; totalShares = 1000000.0
+      vaultId = "vault-main"; underlying = CBTC; totalAssets = 1000000.0; totalShares = 1000000.0
   btcMark <- submit p.oracle do
     createCmd PriceFeed with
       oracle = p.oracle; operator = p.operator; underlying = CBTC; price = 65000.0
@@ -219,7 +219,7 @@ testAllocation = do
   vault0 <- submit p.operator do
     createCmd Vault with
       operator = p.operator; manager = p.manager; auditor = p.auditor
-      underlying = CBTC; totalAssets = 1000000.0; totalShares = 1000000.0
+      vaultId = "vault-main"; underlying = CBTC; totalAssets = 1000000.0; totalShares = 1000000.0
 
   -- oracle publishes a repo rate for a tokenized 3M T-bill: 5.25%/yr.
   rate <- submit p.oracle do
@@ -270,7 +270,7 @@ testTransfer = do
   vault <- submit p.operator do
     createCmd Vault with
       operator = p.operator; manager = p.manager; auditor = p.auditor
-      underlying = CBTC; totalAssets = 0.0; totalShares = 0.0
+      vaultId = "vault-main"; underlying = CBTC; totalAssets = 0.0; totalShares = 0.0
   depReq <- submit p.alice do
     createCmd DepositRequest with
       operator = p.operator; investor = p.alice; amount = 1000.0; vaultCid = vault
@@ -302,3 +302,48 @@ testTransfer = do
   assertMsg "outsider must NOT see any holding" (null mH)
   mT <- query @TransferProposal p.mallory
   assertMsg "outsider must NOT see the transfer proposal" (null mT)
+
+-- Judge-feedback fix (Grand Final): every position is BOUND to its vault.
+-- A second vault — even with the same operator — cannot accrue funding on,
+-- or unwind, a position it didn't open.
+testVaultBinding : Script ()
+testVaultBinding = do
+  p <- setupParties
+  vaultA <- submit p.operator do
+    createCmd Vault with
+      operator = p.operator; manager = p.manager; auditor = p.auditor
+      vaultId = "vault-A"; underlying = CBTC; totalAssets = 1000000.0; totalShares = 1000000.0
+  vaultB <- submit p.operator do
+    createCmd Vault with
+      operator = p.operator; manager = p.manager; auditor = p.auditor
+      vaultId = "vault-B"; underlying = CBTC; totalAssets = 1000000.0; totalShares = 1000000.0
+
+  feed <- submit p.oracle do
+    createCmd PriceFeed with
+      oracle = p.oracle; operator = p.operator; underlying = CBTC; price = 65000.0
+  let plan = RebalancePlan with
+        underlying = CBTC; shortVenue = Hyperliquid; longVenue = Cantex
+        notional = 400000.0; collateralAsset = "USDCx"; collateralRate = 0.0
+  prop <- submit p.manager do
+    exerciseCmd vaultA Vault_ProposeRebalance with plan
+  posA <- submit p.operator do
+    exerciseCmd prop RebalanceProposal_Approve with priceFeedCid = feed
+
+  fundingFeed <- submit p.oracle do
+    createCmd RateFeed with
+      oracle = p.oracle; operator = p.operator
+      kind = Basis; asset = "BTC-PERP-HL"; annualizedRate = 0.10
+
+  -- vault B cannot accrue vault A's position into ITS NAV...
+  submitMustFail p.operator do
+    exerciseCmd vaultB Vault_AccrueFunding with
+      positionCid = posA; rateFeedCid = fundingFeed; yearFraction = 0.25
+  -- ...nor unwind it.
+  submitMustFail p.operator do
+    exerciseCmd vaultB Vault_UnwindPosition with positionCid = posA
+
+  -- vault A, the owner, can.
+  _ <- submit p.operator do
+    exerciseCmd vaultA Vault_AccrueFunding with
+      positionCid = posA; rateFeedCid = fundingFeed; yearFraction = 0.25
+  pure ()

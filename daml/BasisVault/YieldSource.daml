@@ -37,6 +37,7 @@ template Allocation
     operator : Party
     manager : Party
     auditor : Party
+    vaultId : Text             -- bound to the vault that funded it
     kind : YieldSourceKind
     asset : Text
     principal : Decimal        -- working capital deployed to the source
