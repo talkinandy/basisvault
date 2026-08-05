@@ -317,11 +317,19 @@ class LedgerBridge:
 
     # ---------- lifecycle helpers ----------
     def create_vault(self) -> dict:
-        return self.create("operator", "Vault", {
+        args = {
             "operator": self.party["operator"], "manager": self.party["manager"],
             "auditor": self.party["auditor"],
             "underlying": {"tag": "CBTC", "value": {}},
-            "totalAssets": "0.0", "totalShares": "0.0"})
+            "totalAssets": "0.0", "totalShares": "0.0"}
+        # v0.2.0 templates bind everything to a stable vault id (judge-feedback
+        # fix). The shared DevNet node still runs the judged v0.1.0 package
+        # (no such field), so the id is only sent when the target participant
+        # has v0.2.0+:  LEDGER_VAULT_ID=basisyield-main
+        vid = os.environ.get("LEDGER_VAULT_ID", "")
+        if vid:
+            args["vaultId"] = vid
+        return self.create("operator", "Vault", args)
 
     def reset(self) -> None:
         """Archive every basisvault contract, then re-create a fresh Vault."""
