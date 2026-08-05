@@ -276,7 +276,7 @@ a{color:inherit;text-decoration:none}
         <div class="stat"><div class="v green" id="s-range">—</div><div class="l">Rolling-1y yield range</div><div class="s">market-neutral · regime-dependent</div></div>
         <div class="stat"><div class="v" id="s-today">—</div><div class="l">Now — trailing 7d</div><div class="s">net capture at 83% cap-eff</div></div>
         <div class="stat"><div class="v" id="s-avg">—</div><div class="l">3.2-yr APY</div><div class="s">real Hyperliquid funding</div></div>
-        <div class="stat"><div class="v" id="s-dd">—</div><div class="l">Max drawdown</div><div class="s">capital-preserving</div></div>
+        <div class="stat"><div class="v" id="s-dd">—</div><div class="l">Max drawdown*</div><div class="s">funding model — excl. basis/liq/exec risk</div></div>
       </div>
     </div>
   </div>
@@ -398,7 +398,7 @@ a{color:inherit;text-decoration:none}
     <div>
       <div class="bt-stats">
         <div class="bt-stat"><div class="v green" id="bt-apy">—</div><div class="l">3.2-yr blended APY</div></div>
-        <div class="bt-stat"><div class="v" id="bt-dd">—</div><div class="l">Max drawdown</div></div>
+        <div class="bt-stat"><div class="v" id="bt-dd">—</div><div class="l">Max drawdown*</div></div>
         <div class="bt-stat"><div class="v" id="bt-range">—</div><div class="l">Rolling-1y range</div></div>
         <div class="bt-stat"><div class="v" id="bt-today">—</div><div class="l">Now — trailing 7d, net</div></div>
       </div>
@@ -409,7 +409,7 @@ a{color:inherit;text-decoration:none}
         buffer — <b>realized funding only</b>. The range is every rolling year in the data,
         worst to best — the trailing <i>year</i> (≈4.5%) sits at the bottom of it, while the
         last 7 days run richer: funding is regime-dependent, which is the whole point of
-        quoting a range.</p>
+        quoting a range. *Drawdown is the funding model's — it excludes cross-venue basis, liquidation and execution risk; we won't market a risk figure until a live two-leg pilot has measured them.</p>
     </div>
   </div>
 </div></section>

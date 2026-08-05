@@ -94,11 +94,11 @@ perp leverage bounded by the liquidation buffer → 83% of capital earning.
 
 | | APY | Max DD | Notes |
 |---|---|---|---|
-| **cBTC + cETH carry (hero)** | **12.2%** | **0.21%** | sleeves 12.3% / 12.1%; deployed ~82% of hours |
+| **cBTC + cETH carry (hero)** | **12.2%** | **0.21%*** | sleeves 12.3% / 12.1%; deployed ~82% of hours |
 | Rolling-1y range | **4.5% – 22.6%** | | median 11.7% — **today's regime ≈ 4.5%, the bottom; stated, not hidden** |
 | Next phase: RWA-margin stacking | 8.7% *(projection)* | 0.02% | T-bill margin earns ~5% **while** backing the carry |
 
-**Not claimed:** any real-money track record (the production engine paper-trades),
+**Not claimed:** *the 0.21% drawdown is the funding model's — it excludes cross-venue basis, liquidation and execution risk (a live two-leg pilot measures those before we market any risk figure). Also not claimed: any real-money track record (the production engine paper-trades),
 stable APYs (funding is regime-dependent), or on-Canton perp execution (the HL
 short is attested on-ledger as a `VenueLeg`; execution stays un-armed in a demo).
 
